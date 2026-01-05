@@ -17,11 +17,9 @@ jest.mock("obsidian", () => ({
   },
 }));
 
-jest.mock("@/LLMProviders/brevilabsClient", () => ({
-  BrevilabsClient: {
-    getInstance: jest.fn().mockReturnValue({
-      validateLicenseKey: jest.fn().mockResolvedValue({ isValid: true, plan: "believer" }),
-    }),
+jest.mock("@/LLMProviders/externalServicesClient", () => ({
+  ExternalServicesClient: {
+    getInstance: jest.fn().mockReturnValue({}),
   },
 }));
 

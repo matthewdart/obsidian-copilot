@@ -39,12 +39,16 @@ jest.mock("@/settings/model", () => ({
   getSystemPromptWithMemory: jest.fn().mockResolvedValue("Test system prompt"),
   getSettings: jest.fn().mockReturnValue({}),
 }));
+jest.mock("@/state/activeFileTracker", () => ({
+  getActiveContextFile: jest.fn(),
+}));
 import { ChatManager } from "./ChatManager";
 import { MessageRepository } from "./MessageRepository";
 import { ContextManager } from "./ContextManager";
 import { ChainType } from "@/chainFactory";
 import { ChatMessage, MessageContext } from "@/types/message";
 import { TFile } from "obsidian";
+import { getActiveContextFile } from "@/state/activeFileTracker";
 
 const USER_SENDER = "user";
 const createContextResult = (content = "Hello with context") => ({
@@ -138,7 +142,7 @@ describe("ChatManager", () => {
         selectedTextContexts: [],
       };
 
-      mockPlugin.app.workspace.getActiveFile.mockReturnValue(mockActiveFile);
+      (getActiveContextFile as jest.Mock).mockReturnValue(mockActiveFile);
       mockMessageRepo.addMessage.mockReturnValue("msg-1");
       mockMessageRepo.getMessage.mockReturnValue(mockMessage);
       mockContextManager.processMessageContext.mockResolvedValue(createContextResult());
@@ -180,7 +184,7 @@ describe("ChatManager", () => {
         selectedTextContexts: [],
       };
 
-      mockPlugin.app.workspace.getActiveFile.mockReturnValue(mockActiveFile);
+      (getActiveContextFile as jest.Mock).mockReturnValue(mockActiveFile);
       mockMessageRepo.addMessage.mockReturnValue("msg-1");
       mockMessageRepo.getMessage.mockReturnValue(mockMessage);
       mockContextManager.processMessageContext.mockResolvedValue(createContextResult());
@@ -210,7 +214,7 @@ describe("ChatManager", () => {
         selectedTextContexts: [],
       };
 
-      mockPlugin.app.workspace.getActiveFile.mockReturnValue(null);
+      (getActiveContextFile as jest.Mock).mockReturnValue(null);
       mockMessageRepo.addMessage.mockReturnValue("msg-1");
       mockMessageRepo.getMessage.mockReturnValue(mockMessage);
       mockContextManager.processMessageContext.mockResolvedValue(createContextResult());
@@ -236,7 +240,7 @@ describe("ChatManager", () => {
         selectedTextContexts: [],
       };
 
-      mockPlugin.app.workspace.getActiveFile.mockReturnValue(null);
+      (getActiveContextFile as jest.Mock).mockReturnValue(null);
       mockMessageRepo.addMessage.mockReturnValue("msg-1");
       mockMessageRepo.getMessage.mockReturnValue(undefined); // Simulate failure
 
@@ -250,7 +254,7 @@ describe("ChatManager", () => {
     it("should edit a message and reprocess context", async () => {
       const mockActiveFile = { path: "active.md", basename: "active" } as TFile;
 
-      mockPlugin.app.workspace.getActiveFile.mockReturnValue(mockActiveFile);
+      (getActiveContextFile as jest.Mock).mockReturnValue(mockActiveFile);
       mockMessageRepo.editMessage.mockReturnValue(true);
       mockContextManager.reprocessMessageContext.mockResolvedValue(undefined);
 
@@ -512,7 +516,7 @@ describe("ChatManager", () => {
           selectedTextContexts: [],
         };
 
-        mockPlugin.app.workspace.getActiveFile.mockReturnValue(mockActiveFile);
+        (getActiveContextFile as jest.Mock).mockReturnValue(mockActiveFile);
         mockMessageRepo.addMessage.mockReturnValue("msg-1");
         mockMessageRepo.getMessage.mockReturnValue(mockMessage);
         mockContextManager.processMessageContext.mockResolvedValue(createContextResult());
@@ -556,7 +560,7 @@ describe("ChatManager", () => {
       it("should reprocess context after editing", async () => {
         const mockActiveFile = { path: "active.md", basename: "active" } as TFile;
 
-        mockPlugin.app.workspace.getActiveFile.mockReturnValue(mockActiveFile);
+        (getActiveContextFile as jest.Mock).mockReturnValue(mockActiveFile);
         mockMessageRepo.editMessage.mockReturnValue(true);
         mockContextManager.reprocessMessageContext.mockResolvedValue(undefined);
 

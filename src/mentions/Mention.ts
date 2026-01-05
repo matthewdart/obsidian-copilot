@@ -1,5 +1,5 @@
 import { ImageProcessor } from "@/imageProcessing/imageProcessor";
-import { BrevilabsClient, Url4llmResponse } from "@/LLMProviders/brevilabsClient";
+import { ExternalServicesClient, Url4llmResponse } from "@/LLMProviders/externalServicesClient";
 import { err2String, isYoutubeUrl } from "@/utils";
 import { logError } from "@/logger";
 
@@ -13,11 +13,11 @@ export interface MentionData {
 export class Mention {
   private static instance: Mention;
   private mentions: Map<string, MentionData>;
-  private brevilabsClient: BrevilabsClient;
+  private externalServicesClient: ExternalServicesClient;
 
   private constructor() {
     this.mentions = new Map();
-    this.brevilabsClient = BrevilabsClient.getInstance();
+    this.externalServicesClient = ExternalServicesClient.getInstance();
   }
 
   static getInstance(): Mention {
@@ -44,7 +44,7 @@ export class Mention {
 
   async processUrl(url: string): Promise<Url4llmResponse & { error?: string }> {
     try {
-      return await this.brevilabsClient.url4llm(url);
+      return await this.externalServicesClient.url4llm(url);
     } catch (error) {
       const msg = err2String(error);
       logError(`Error processing URL ${url}: ${msg}`);
@@ -54,7 +54,7 @@ export class Mention {
 
   async processYoutubeUrl(url: string): Promise<{ transcript: string; error?: string }> {
     try {
-      const response = await this.brevilabsClient.youtube4llm(url);
+      const response = await this.externalServicesClient.youtube4llm(url);
       return { transcript: response.response.transcript };
     } catch (error) {
       const msg = err2String(error);

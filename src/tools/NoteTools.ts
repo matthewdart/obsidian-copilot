@@ -1,4 +1,4 @@
-import { TFile } from "obsidian";
+import { MarkdownView, TFile } from "obsidian";
 import { z } from "zod";
 import { logInfo, logWarn } from "@/logger";
 import { createTool } from "./SimpleTool";
@@ -215,13 +215,62 @@ async function resolveNoteFile(notePath: string): Promise<ResolveNoteOutcome> {
   return { type: "not_found" };
 }
 
+/**
+ * Read note content, preferring the open editor buffer before vault reads.
+ *
+ * @param file - Note file to read.
+ * @returns The note content as text.
+ */
 async function readNoteText(file: TFile): Promise<string> {
+  const openViewText = readOpenNoteText(file);
+  if (openViewText !== null) {
+    return openViewText;
+  }
+
   try {
-    return await app.vault.cachedRead(file);
+    const cachedText = await app.vault.cachedRead(file);
+    if (cachedText.length > 0 || file.stat?.size === 0) {
+      return cachedText;
+    }
+
+    if (typeof app.vault.read === "function") {
+      return await app.vault.read(file);
+    }
+
+    return cachedText;
   } catch (error) {
     logWarn(`readNote: failed to read ${file.path}`, error);
+    if (typeof app.vault.read === "function") {
+      try {
+        return await app.vault.read(file);
+      } catch (fallbackError) {
+        logWarn(`readNote: fallback read failed for ${file.path}`, fallbackError);
+      }
+    }
     return "";
   }
+}
+
+/**
+ * Returns the live editor content for a note if it is currently open.
+ *
+ * @param file - Note file to locate in open markdown views.
+ * @returns The current editor content, or null when the note is not open.
+ */
+function readOpenNoteText(file: TFile): string | null {
+  if (!app?.workspace?.getLeavesOfType || typeof MarkdownView === "undefined") {
+    return null;
+  }
+
+  const leaves = app.workspace.getLeavesOfType("markdown");
+  for (const leaf of leaves) {
+    const view = leaf.view;
+    if (view instanceof MarkdownView && view.file?.path === file.path) {
+      return view.getViewData();
+    }
+  }
+
+  return null;
 }
 
 function buildBasenameIndex(): Map<string, TFile[]> {

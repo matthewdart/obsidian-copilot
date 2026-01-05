@@ -1,4 +1,4 @@
-import { BrevilabsClient } from "@/LLMProviders/brevilabsClient";
+import { ExternalServicesClient } from "@/LLMProviders/externalServicesClient";
 import ProjectManager from "@/LLMProviders/projectManager";
 import { CustomModel, getCurrentProject, setSelectedTextContexts } from "@/aiParams";
 import { SelectedTextContext } from "@/types/message";
@@ -20,7 +20,6 @@ import { logInfo } from "@/logger";
 import { logFileManager } from "@/logFileManager";
 import { UserMemoryManager } from "@/memory/UserMemoryManager";
 import { clearRecordedPromptPayload } from "@/LLMProviders/chainRunner/utils/promptPayloadRecorder";
-import { checkIsPlusUser } from "@/plusUtils";
 import VectorStoreManager from "@/search/vectorStoreManager";
 import { CopilotSettingTab } from "@/settings/SettingsPage";
 import {
@@ -31,6 +30,11 @@ import {
   subscribeToSettingsChange,
 } from "@/settings/model";
 import { ChatUIState } from "@/state/ChatUIState";
+import {
+  getLeafContextFile,
+  trackContextFile,
+  trackLeafContextFile,
+} from "@/state/activeFileTracker";
 import { VaultDataManager } from "@/state/vaultDataAtoms";
 import { FileParserManager } from "@/tools/FileParserManager";
 import { initializeBuiltinTools } from "@/tools/builtinTools";
@@ -46,6 +50,7 @@ import {
 } from "obsidian";
 import { ChatHistoryItem } from "@/components/chat-components/ChatHistoryPopover";
 import { extractChatTitle, extractChatDate } from "@/utils/chatHistoryUtils";
+import { isAllowedFileForNoteContext } from "@/utils";
 import { v4 as uuidv4 } from "uuid";
 
 // Removed unused FileTrackingState interface
@@ -53,7 +58,7 @@ import { v4 as uuidv4 } from "uuid";
 export default class CopilotPlugin extends Plugin {
   // Plugin components
   projectManager: ProjectManager;
-  brevilabsClient: BrevilabsClient;
+  externalServicesClient: ExternalServicesClient;
   userMessageHistory: string[] = [];
   vectorStoreManager: VectorStoreManager;
   fileParserManager: FileParserManager;
@@ -81,10 +86,8 @@ export default class CopilotPlugin extends Plugin {
     // Initialize built-in tools with vault access
     initializeBuiltinTools(this.app.vault);
 
-    // Initialize BrevilabsClient
-    this.brevilabsClient = BrevilabsClient.getInstance();
-    this.brevilabsClient.setPluginVersion(this.manifest.version);
-    checkIsPlusUser();
+    // Initialize external services client
+    this.externalServicesClient = ExternalServicesClient.getInstance();
 
     // Initialize ProjectManager
     this.projectManager = ProjectManager.getInstance(this.app, this);
@@ -98,7 +101,7 @@ export default class CopilotPlugin extends Plugin {
     vaultDataManager.initialize();
 
     // Initialize FileParserManager early with other core services
-    this.fileParserManager = new FileParserManager(this.brevilabsClient, this.app.vault);
+    this.fileParserManager = new FileParserManager(this.externalServicesClient, this.app.vault);
 
     // Initialize ChatUIState with new architecture
     const messageRepo = new MessageRepository();
@@ -113,6 +116,8 @@ export default class CopilotPlugin extends Plugin {
     this.registerView(APPLY_VIEW_TYPE, (leaf: WorkspaceLeaf) => new ApplyView(leaf));
 
     this.initActiveLeafChangeHandler();
+    // Seed the last active context file for chat on startup.
+    trackLeafContextFile(this.app.workspace.getMostRecentLeaf());
 
     this.addRibbonIcon("message-square", "Open Copilot Chat", (evt: MouseEvent) => {
       this.activateView();
@@ -142,20 +147,41 @@ export default class CopilotPlugin extends Plugin {
 
     this.registerEvent(
       this.app.workspace.on("active-leaf-change", (leaf) => {
-        if (leaf && leaf.view instanceof MarkdownView) {
-          const file = leaf.view.file;
-          if (file) {
-            // Note: File tracking and real-time reindexing removed for simplicity
-            // Semantic search indexes are rebuilt manually or on startup as needed
-            const activeCopilotView = this.app.workspace
-              .getLeavesOfType(CHAT_VIEWTYPE)
-              .find((leaf) => leaf.view instanceof CopilotView)?.view as CopilotView;
+        const contextFile = getLeafContextFile(leaf);
+        if (!contextFile) {
+          return;
+        }
 
-            if (activeCopilotView) {
-              const event = new CustomEvent(EVENT_NAMES.ACTIVE_LEAF_CHANGE);
-              activeCopilotView.eventTarget.dispatchEvent(event);
-            }
-          }
+        trackLeafContextFile(leaf);
+
+        // Note: File tracking and real-time reindexing removed for simplicity
+        // Semantic search indexes are rebuilt manually or on startup as needed
+        const activeCopilotView = this.app.workspace
+          .getLeavesOfType(CHAT_VIEWTYPE)
+          .find((leaf) => leaf.view instanceof CopilotView)?.view as CopilotView;
+
+        if (activeCopilotView) {
+          const event = new CustomEvent(EVENT_NAMES.ACTIVE_LEAF_CHANGE);
+          activeCopilotView.eventTarget.dispatchEvent(event);
+        }
+      })
+    );
+
+    this.registerEvent(
+      this.app.workspace.on("file-open", (file) => {
+        if (!isAllowedFileForNoteContext(file)) {
+          return;
+        }
+
+        trackContextFile(file);
+
+        const activeCopilotView = this.app.workspace
+          .getLeavesOfType(CHAT_VIEWTYPE)
+          .find((leaf) => leaf.view instanceof CopilotView)?.view as CopilotView;
+
+        if (activeCopilotView) {
+          const event = new CustomEvent(EVENT_NAMES.ACTIVE_LEAF_CHANGE);
+          activeCopilotView.eventTarget.dispatchEvent(event);
         }
       })
     );

@@ -356,7 +356,7 @@ export interface ProviderResponseMap {
   [ChatModelProviders.XAI]: XAIModelResponse;
   [ChatModelProviders.OPENROUTERAI]: OpenRouterAIModelResponse;
   [ChatModelProviders.SILICONFLOW]: SiliconFlowModelResponse;
-  [ChatModelProviders.COPILOT_PLUS]: null;
+  [ChatModelProviders.COPILOT_PLUS]: OpenAIModelResponse;
   [ChatModelProviders.AZURE_OPENAI]: null;
   [ChatModelProviders.AMAZON_BEDROCK]: unknown;
 }
@@ -381,6 +381,12 @@ export const providerAdapters: ProviderModelAdapters = {
       id: model.id,
       name: model.id,
       provider: ChatModelProviders.OPENAI,
+    })) || [],
+  [ChatModelProviders.COPILOT_PLUS]: (data): StandardModel[] =>
+    (data as OpenAIModelResponse)?.data?.map((model) => ({
+      id: model.id,
+      name: model.id,
+      provider: ChatModelProviders.COPILOT_PLUS,
     })) || [],
 
   [ChatModelProviders.GOOGLE]: (data): StandardModel[] =>

@@ -96,8 +96,7 @@ Read the [Changelog](https://github.com/logancyang/obsidian-copilot/releases/tag
 
 **Copilot Plus/Believer**
 
-1. Copy your license key at your [dashboard](https://www.obsidiancopilot.com/en/dashboard). _Don’t forget to join our wonderful Discord community!_
-2. Go to **Obsidian → Settings → Copilot → Basic** and paste the key into in the **Copilot Plus** card.
+Copilot Plus features are included automatically once your provider API keys are configured—no separate license key or payment step is required.
 
 ## Usage
 
@@ -216,6 +215,8 @@ Use it to quickly reference past research, ideas, or decisions—no need to sear
 ### Copilot Plus/Believer
 
 Copilot Plus brings powerful AI agentic capabilities, context-aware actions and seamless tool integration—built to elevate your knowledge work in Obsidian.
+
+> Note: These capabilities are now included without a separate Believer/Plus license; just configure your provider API keys.
 
 #### **Get Precision Insights From a Specific Time Window**
 
@@ -342,19 +343,15 @@ Special thanks to our top sponsors: @mikelaaron, @pedramamini, @Arlorean, @dashi
 
 ## **Copilot Plus Disclosure**
 
-Copilot Plus is a premium product of Brevilabs LLC and it is not affiliated with Obsidian. It offers a powerful agentic AI integration into Obsidian. Please check out our website [obsidiancopilot.com](https://obsidiancopilot.com/) for more details!
+Copilot Plus features are bundled with the plugin and rely on the API providers you configure (OpenAI, Anthropic, Google, etc.) plus open services such as DuckDuckGo search and public YouTube transcripts. No Brevilabs backend or separate license is required.
 
-- An account and payment are required for full access.
-- Copilot Plus requires network use to facilitate the AI agent.
+- Network use depends on your configured providers and optional search/transcript requests.
 - **Privacy & Data Handling**:
-  - **Free tier**: Your messages and notes are sent only to your configured LLM provider (OpenAI, Anthropic, Google, etc.). Nothing goes to Brevilabs servers.
-  - **Plus tier**: Messages go to your configured LLM provider. File conversions (PDF, DOCX, EPUB, images, etc.) are processed by Brevilabs servers only when you explicitly trigger these features via `@` commands.
-  - **Processing vs. Retention**: We process your data to deliver the feature you requested, then discard it. No message content, file uploads, or documents are retained on our servers after processing.
-  - **User ID**: A randomly generated UUID is sent with Plus API requests for service delivery (license abuse prevention, rate limiting) but is not used for user tracking, profiling, or analytics.
-- Please see the privacy policy on the website for more details.
-- The frontend code of Copilot plugin is fully open-source. However, the backend code facilitating the AI agents is close-sourced and proprietary.
-- We offer a full refund if you are not satisfied with the product within 14 days of your purchase, no questions asked.
+  - Messages and notes are sent only to your configured LLM provider(s).
+  - File conversions run locally when possible; otherwise they use the same providers you configure—no additional backend processes your data.
+  - Random UUIDs remain client-side for settings; no external license verification occurs.
+- Please review each provider’s policy for details on how they handle requests.
 
 ## **Authors**
 
-Brevilabs Team | Email: logan@brevilabs.com | X/Twitter: [@logancyang](https://twitter.com/logancyang)
+Copilot for Obsidian Team

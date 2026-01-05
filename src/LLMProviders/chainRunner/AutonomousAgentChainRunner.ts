@@ -9,11 +9,18 @@ import { extractParametersFromZod, SimpleTool } from "@/tools/SimpleTool";
 import { ToolRegistry } from "@/tools/ToolRegistry";
 import { deriveReadNoteDisplayName, ToolResultFormatter } from "@/tools/ToolResultFormatter";
 import { ChatMessage, ResponseMetadata, StreamingResult } from "@/types/message";
-import { err2String, getMessageRole, withSuppressedTokenWarnings } from "@/utils";
+import {
+  ChatHistoryEntry,
+  err2String,
+  extractChatHistory,
+  getMessageRole,
+  withSuppressedTokenWarnings,
+} from "@/utils";
 import { formatErrorChunk, processToolResults } from "@/utils/toolResultUtils";
 import { AIMessage, BaseMessage, HumanMessage } from "@langchain/core/messages";
 import { CopilotPlusChainRunner } from "./CopilotPlusChainRunner";
 import { addChatHistoryToMessages } from "./utils/chatHistoryUtils";
+import { AVAILABLE_TOOLS } from "@/components/chat-components/constants/tools";
 import {
   joinPromptSections,
   messageRequiresTools,
@@ -47,6 +54,7 @@ import {
   extractToolNameFromPartialBlock,
   parseXMLToolCalls,
   stripToolCallXML,
+  ToolCall,
 } from "./utils/xmlParsing";
 
 type ConversationMessage = {
@@ -83,6 +91,9 @@ interface AgentRunContext {
   iterationHistory: string[];
   collectedSources: AgentSource[];
   originalUserPrompt: string;
+  cleanedUserPrompt: string;
+  chatHistory: ChatHistoryEntry[];
+  forcedToolCalls: ToolCall[];
   loopDeps: AgentLoopDeps;
 }
 
@@ -212,6 +223,86 @@ ${params}
 
   private getTemporaryToolCallId(toolName: string, index: number): string {
     return `temporary-tool-call-id-${toolName}-${index}`;
+  }
+
+  /**
+   * Extract @command tokens from the user prompt and return a cleaned message.
+   *
+   * @param message - Raw user prompt text.
+   * @returns Command set and cleaned message with @commands removed.
+   */
+  private extractAtCommandDirectives(message: string): {
+    commands: Set<string>;
+    cleanedMessage: string;
+  } {
+    const tokens = message.split(/\s+/).filter(Boolean);
+    const commands = new Set<string>();
+    const cleanedTokens: string[] = [];
+
+    for (const token of tokens) {
+      const lowered = token.toLowerCase();
+      if (lowered === "@web") {
+        commands.add("@websearch");
+        continue;
+      }
+      if (AVAILABLE_TOOLS.includes(lowered)) {
+        commands.add(lowered);
+        continue;
+      }
+      cleanedTokens.push(token);
+    }
+
+    return {
+      commands,
+      cleanedMessage: cleanedTokens.join(" ").trim(),
+    };
+  }
+
+  /**
+   * Build forced tool calls from explicit @command directives.
+   *
+   * @param commands - Set of parsed @commands.
+   * @param cleanedMessage - Message content with @commands removed.
+   * @param chatHistory - Prior chat history for web search queries.
+   * @returns Tool calls to execute before agent planning.
+   */
+  private buildAtCommandToolCalls(
+    commands: Set<string>,
+    cleanedMessage: string,
+    chatHistory: ChatHistoryEntry[]
+  ): ToolCall[] {
+    const toolCalls: ToolCall[] = [];
+
+    if (commands.has("@vault")) {
+      toolCalls.push({
+        name: "localSearch",
+        args: {
+          query: cleanedMessage,
+          salientTerms: [],
+        },
+      });
+    }
+
+    if (commands.has("@websearch")) {
+      toolCalls.push({
+        name: "webSearch",
+        args: {
+          query: cleanedMessage,
+          chatHistory,
+        },
+      });
+    }
+
+    if (commands.has("@memory")) {
+      toolCalls.push({
+        name: "updateMemory",
+        args: {
+          statement: cleanedMessage,
+        },
+      });
+    }
+
+    return toolCalls;
   }
 
   /**
@@ -395,6 +486,7 @@ ${params}
     const memory = this.chainManager.memoryManager.getMemory();
     const memoryVariables = await memory.loadMemoryVariables({});
     const rawHistory = memoryVariables.history || [];
+    const chatHistory = extractChatHistory(memoryVariables);
 
     // Build system message: L1+L2 from envelope + tool-only sections
     const systemMessage = baseMessages.find((m) => m.role === "system");
@@ -439,6 +531,8 @@ ${params}
     const l5User = envelope.layers.find((l) => l.id === "L5_USER");
     const l5Text = l5User?.text || "";
     const originalUserPrompt = l5Text || userMessage.originalMessage || userMessage.message;
+    const { commands, cleanedMessage } = this.extractAtCommandDirectives(originalUserPrompt);
+    const forcedToolCalls = this.buildAtCommandToolCalls(commands, cleanedMessage, chatHistory);
 
     // Extract user content (L3 smart references + L5) from base messages
     const userMessageContent = baseMessages.find((m) => m.role === "user");
@@ -468,6 +562,9 @@ ${params}
       iterationHistory,
       collectedSources,
       originalUserPrompt,
+      cleanedUserPrompt: cleanedMessage,
+      chatHistory,
+      forcedToolCalls,
       loopDeps,
     };
   }
@@ -485,6 +582,8 @@ ${params}
       iterationHistory: initialIterationHistory,
       collectedSources: initialCollectedSources,
       originalUserPrompt,
+      cleanedUserPrompt,
+      forcedToolCalls,
       loopDeps,
       adapter,
       abortController,
@@ -499,6 +598,112 @@ ${params}
     let iteration = 0;
     let fullAIResponse = "";
     let responseMetadata: ResponseMetadata | undefined;
+    const effectiveUserPrompt = cleanedUserPrompt || originalUserPrompt;
+
+    if (forcedToolCalls.length > 0) {
+      const forcedToolCallMessages: string[] = [];
+      const forcedResults: ToolExecutionResult[] = [];
+
+      for (let i = 0; i < forcedToolCalls.length; i += 1) {
+        const toolCall = forcedToolCalls[i];
+        if (this.isAbortRequested(abortController)) {
+          break;
+        }
+
+        let toolDisplayName = getToolDisplayName(toolCall.name);
+        if (toolCall.name === "readNote") {
+          const notePath =
+            typeof toolCall.args?.notePath === "string" ? toolCall.args.notePath : null;
+          if (notePath && notePath.trim().length > 0) {
+            toolDisplayName = deriveReadNoteDisplayName(notePath);
+          }
+        }
+
+        const toolCallId = `${toolCall.name}-${Date.now()}-${Math.random()
+          .toString(36)
+          .substring(2, 11)}`;
+        const toolEmoji = getToolEmoji(toolCall.name);
+        const confirmationMessage = getToolConfirmtionMessage(toolCall.name, toolCall.args) || "";
+        const toolCallMarker = createToolCallMarker(
+          toolCallId,
+          toolCall.name,
+          toolDisplayName,
+          toolEmoji,
+          confirmationMessage,
+          true,
+          "",
+          ""
+        );
+
+        forcedToolCallMessages.push(toolCallMarker);
+        updateCurrentAiMessage(
+          [...iterationHistory, ...forcedToolCallMessages].join("\n\n").trim()
+        );
+
+        const result = await executeSequentialToolCall(
+          toolCall,
+          availableTools,
+          effectiveUserPrompt
+        );
+
+        if (!result.success) {
+          result.displayResult = formatErrorChunk(result.result, "Tool execution failed");
+        }
+
+        if (toolCall.name === "localSearch") {
+          if (result.success) {
+            const processed = loopDeps.processLocalSearchResult(result);
+            collectedSources.push(...processed.sources);
+            result.result = loopDeps.applyCiCOrderingToLocalSearchResult(
+              processed.formattedForLLM,
+              effectiveUserPrompt
+            );
+            result.displayResult = processed.formattedForDisplay;
+          }
+        } else if (toolCall.name === "readNote") {
+          if (result.success) {
+            result.displayResult = ToolResultFormatter.format("readNote", result.result);
+          }
+        } else if (toolCall.name === "webSearch") {
+          if (result.success) {
+            result.displayResult = ToolResultFormatter.format("webSearch", result.result);
+          }
+        }
+
+        forcedResults.push(result);
+
+        const markerIndex = forcedToolCallMessages.findIndex((message) =>
+          message.includes(toolCallId)
+        );
+        if (markerIndex !== -1) {
+          forcedToolCallMessages[markerIndex] = updateToolCallMarker(
+            forcedToolCallMessages[markerIndex],
+            toolCallId,
+            result.displayResult ?? result.result
+          );
+        }
+
+        updateCurrentAiMessage(
+          [...iterationHistory, ...forcedToolCallMessages].join("\n\n").trim()
+        );
+      }
+
+      if (forcedToolCallMessages.length > 0) {
+        iterationHistory.push(forcedToolCallMessages.join("\n"));
+      }
+
+      if (forcedResults.length > 0) {
+        const toolResultsForLLM = processToolResults(forcedResults, true);
+        if (toolResultsForLLM) {
+          llmMessages.push(toolResultsForLLM);
+        }
+        const toolResultsForConversation = processToolResults(forcedResults, false);
+        conversationMessages.push({
+          role: "user",
+          content: toolResultsForConversation,
+        });
+      }
+    }
 
     while (iteration < maxIterations) {
       if (this.isAbortRequested(abortController)) {

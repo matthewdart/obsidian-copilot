@@ -16,7 +16,7 @@ import { isPlusChain } from "@/utils";
 
 import { useSettingsValue } from "@/settings/model";
 import { SelectedTextContext } from "@/types/message";
-import { isAllowedFileForNoteContext } from "@/utils";
+import { useActiveFile as useWorkspaceActiveFile } from "@/hooks/useActiveFile";
 import { CornerDownLeft, Image, Loader2, StopCircle, X } from "lucide-react";
 import { App, Notice, TFile } from "obsidian";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -102,10 +102,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const [currentChain] = useChainType();
   const [isProjectLoading] = useProjectLoading();
   const settings = useSettingsValue();
-  const [currentActiveNote, setCurrentActiveNote] = useState<TFile | null>(() => {
-    const activeFile = app.workspace.getActiveFile();
-    return isAllowedFileForNoteContext(activeFile) ? activeFile : null;
-  });
+  const currentActiveNote = useWorkspaceActiveFile();
   const [selectedProject, setSelectedProject] = useState<ProjectConfig | null>(null);
   const [notesFromPills, setNotesFromPills] = useState<{ path: string; basename: string }[]>([]);
   const [urlsFromPills, setUrlsFromPills] = useState<string[]>([]);
@@ -327,8 +324,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
         break;
       case "notes":
         if (data instanceof TFile) {
-          const activeNote = app.workspace.getActiveFile();
-          if (activeNote && data.path === activeNote.path) {
+          if (currentActiveNote && data.path === currentActiveNote.path) {
             setIncludeActiveNote(true);
             setContextNotes((prev) => prev.filter((n) => n.path !== data.path));
           } else {
@@ -499,30 +495,6 @@ const ChatInput: React.FC<ChatInputProps> = ({
       return [...prev, ...newFoldersFromPills];
     });
   }, [foldersFromPills]);
-
-  // Update the current active note whenever it changes
-  useEffect(() => {
-    let timeoutId: ReturnType<typeof setTimeout>;
-
-    const handleActiveLeafChange = () => {
-      // Clear any existing timeout
-      clearTimeout(timeoutId);
-
-      // Set new timeout
-      timeoutId = setTimeout(() => {
-        const activeNote = app.workspace.getActiveFile();
-        setCurrentActiveNote(isAllowedFileForNoteContext(activeNote) ? activeNote : null);
-      }, 100); // Wait 100ms after the last event because it fires multiple times
-    };
-
-    const eventRef = app.workspace.on("active-leaf-change", handleActiveLeafChange);
-
-    return () => {
-      clearTimeout(timeoutId); // Clean up any pending timeout
-      // cspell:disable-next-line
-      app.workspace.offref(eventRef); // Remove event listener
-    };
-  }, [app.workspace]);
 
   const onEditorReady = useCallback((editor: any) => {
     lexicalEditorRef.current = editor;

@@ -1,6 +1,5 @@
 import { setChainType, setModelKey } from "@/aiParams";
 import { ChainType } from "@/chainFactory";
-import { CopilotPlusExpiredModal } from "@/components/modals/CopilotPlusExpiredModal";
 import {
   ChatModelProviders,
   ChatModels,
@@ -9,17 +8,16 @@ import {
   EmbeddingModels,
   PlusUtmMedium,
 } from "@/constants";
-import { BrevilabsClient } from "@/LLMProviders/brevilabsClient";
 import { logError, logInfo } from "@/logger";
 import { getSettings, setSettings, updateSetting, useSettingsValue } from "@/settings/model";
 import { Notice } from "obsidian";
 
 export const DEFAULT_COPILOT_PLUS_CHAT_MODEL = ChatModels.COPILOT_PLUS_FLASH;
 export const DEFAULT_COPILOT_PLUS_CHAT_MODEL_KEY =
-  DEFAULT_COPILOT_PLUS_CHAT_MODEL + "|" + ChatModelProviders.COPILOT_PLUS;
+  DEFAULT_COPILOT_PLUS_CHAT_MODEL + "|" + ChatModelProviders.OPENAI;
 export const DEFAULT_COPILOT_PLUS_EMBEDDING_MODEL = EmbeddingModels.COPILOT_PLUS_SMALL;
 export const DEFAULT_COPILOT_PLUS_EMBEDDING_MODEL_KEY =
-  DEFAULT_COPILOT_PLUS_EMBEDDING_MODEL + "|" + EmbeddingModelProviders.COPILOT_PLUS;
+  DEFAULT_COPILOT_PLUS_EMBEDDING_MODEL + "|" + EmbeddingModelProviders.OPENAI;
 
 // Default models for free users (imported from DEFAULT_SETTINGS)
 export const DEFAULT_FREE_CHAT_MODEL_KEY = DEFAULT_SETTINGS.defaultModelKey;
@@ -27,7 +25,7 @@ export const DEFAULT_FREE_EMBEDDING_MODEL_KEY = DEFAULT_SETTINGS.embeddingModelK
 
 /** Check if the model key is a Copilot Plus model. */
 export function isPlusModel(modelKey: string): boolean {
-  return modelKey.split("|")[1] === EmbeddingModelProviders.COPILOT_PLUS;
+  return false;
 }
 
 /** Hook to get the isPlusUser setting. */
@@ -38,23 +36,15 @@ export function useIsPlusUser(): boolean | undefined {
 
 /** Check if the user is a Plus user. */
 export async function checkIsPlusUser(context?: Record<string, any>): Promise<boolean | undefined> {
-  if (!getSettings().plusLicenseKey) {
-    turnOffPlus();
-    return false;
-  }
-  const brevilabsClient = BrevilabsClient.getInstance();
-  const result = await brevilabsClient.validateLicenseKey(context);
-  return result.isValid;
+  // Licensing has been removed; always enable Plus features.
+  turnOnPlus();
+  return true;
 }
 
 /** Check if the user is on the believer plan. */
 export async function isBelieverPlan(): Promise<boolean> {
-  if (!getSettings().plusLicenseKey) {
-    return false;
-  }
-  const brevilabsClient = BrevilabsClient.getInstance();
-  const result = await brevilabsClient.validateLicenseKey();
-  return result.plan?.toLowerCase() === "believer";
+  // Believer plan gating removed alongside licensing.
+  return true;
 }
 
 /**
@@ -121,6 +111,6 @@ export function turnOffPlus(): void {
   const previousIsPlusUser = getSettings().isPlusUser;
   updateSetting("isPlusUser", false);
   if (previousIsPlusUser) {
-    new CopilotPlusExpiredModal(app).open();
+    // License gating removed; no modal is shown on status changes.
   }
 }

@@ -2,6 +2,8 @@
 
 This document captures the current responsibilities of the Copilot Plus intent analysis flow (`IntentAnalyzer` + Brevilabs “broca” API) and outlines a safe migration path to remove it while keeping Copilot Plus functionality aligned with the autonomous agent experience. The end state is simple: the user-facing chat model (same family as the agent chain) owns tool planning, salient term extraction, and time-expression handling; Broca is fully removed.
 
+> Note: Brevilabs endpoints have since been removed from the codebase. This file remains as historical context for the prior migration plan.
+
 ## Current Responsibilities
 
 - **Tool orchestration via Broca** (`src/LLMProviders/intentAnalyzer.ts:34`\
@@ -20,7 +22,7 @@ This document captures the current responsibilities of the Copilot Plus intent a
 ## Known Consumers and Side Effects
 
 - `CopilotPlusChainRunner.run` (`src/LLMProviders/chainRunner/CopilotPlusChainRunner.ts:488`) is the sole caller of `IntentAnalyzer.analyzeIntent`.
-- `BrevilabsClient` exposes `broca` and `/license` validation; multiple subsystems already call `validateLicenseKey` directly (e.g., `checkIsPlusUser`, `embeddingManager`, `plusUtils`).
+- Legacy `BrevilabsClient` exposed `broca` and `/license` validation; those calls have been removed in favor of open providers.
 - Tests: there is no direct unit test coverage for `IntentAnalyzer`, but tool execution tests (`src/LLMProviders/chainRunner/utils/toolExecution.test.ts`) rely on the same registry.
 - Production telemetry/debug logging assumes the Broca payload; removal must not break logging expectations.
 
@@ -65,7 +67,7 @@ This document captures the current responsibilities of the Copilot Plus intent a
 
 13. **Switch default planner**: flip the feature flag when parity is reached; Broca stays as a hidden one-release fallback.
 14. **Delete `IntentAnalyzer`**: remove the class, tests, and references; drop `initTools` from `src/main.ts` (tool registration already handled elsewhere).
-15. **Retire `BrevilabsClient.broca`**: remove the method and unused types; keep `/license` and others.
+15. **Retire `BrevilabsClient.broca`**: remove the method and unused types; keep `/license` and others. _Status: Brevilabs endpoints removed._
 16. **Documentation & migration notes**: update `AGENTS.md`, `TODO.md`, and user-facing Plus docs.
 
 ### Phase 5 – Prepare for Self-Host Mode

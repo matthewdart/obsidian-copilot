@@ -1,7 +1,7 @@
 import { getStandaloneQuestion } from "@/chainUtils";
 import { TEXT_WEIGHT } from "@/constants";
-import { BrevilabsClient } from "@/LLMProviders/brevilabsClient";
-import { logInfo } from "@/logger";
+import { ExternalServicesClient } from "@/LLMProviders/externalServicesClient";
+import { logError, logInfo } from "@/logger";
 import { getSettings } from "@/settings/model";
 import { z } from "zod";
 import { deduplicateSources } from "@/LLMProviders/chainRunner/utils/toolExecution";
@@ -279,13 +279,13 @@ const webSearchTool = createTool({
   name: "webSearch",
   description: "Search the web for information",
   schema: webSearchSchema,
-  isPlusOnly: true,
+  isPlusOnly: false,
   handler: async ({ query, chatHistory }) => {
     try {
       // Get standalone question considering chat history
       const standaloneQuestion = await getStandaloneQuestion(query, chatHistory);
 
-      const response = await BrevilabsClient.getInstance().webSearch(standaloneQuestion);
+      const response = await ExternalServicesClient.getInstance().webSearch(standaloneQuestion);
       const citations = response.response.citations || [];
 
       // Return structured JSON response for consistency with other tools
@@ -305,7 +305,7 @@ const webSearchTool = createTool({
 
       return JSON.stringify(formattedResults);
     } catch (error) {
-      console.error(`Error processing web search query ${query}:`, error);
+      logError(`Error processing web search query ${query}`, error);
       return "";
     }
   },

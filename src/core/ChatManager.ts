@@ -1,18 +1,20 @@
-import { getSettings, getSystemPromptWithMemory } from "@/settings/model";
-import { ChainType } from "@/chainFactory";
+import { TFile } from "obsidian";
+
 import { getCurrentProject } from "@/aiParams";
+import { ChainType } from "@/chainFactory";
+import { updateChatMemory } from "@/chatUtils";
+import { USER_SENDER } from "@/constants";
 import { logInfo } from "@/logger";
-import { ChatMessage, MessageContext } from "@/types/message";
+import CopilotPlugin from "@/main";
+import { getSettings, getSystemPromptWithMemory } from "@/settings/model";
+import { getActiveContextFile } from "@/state/activeFileTracker";
 import { FileParserManager } from "@/tools/FileParserManager";
+import { ChatMessage, MessageContext } from "@/types/message";
 import ChainManager from "@/LLMProviders/chainManager";
 import ProjectManager from "@/LLMProviders/projectManager";
-import { updateChatMemory } from "@/chatUtils";
-import CopilotPlugin from "@/main";
 import { ContextManager } from "./ContextManager";
 import { MessageRepository } from "./MessageRepository";
 import { ChatPersistenceManager } from "./ChatPersistenceManager";
-import { USER_SENDER } from "@/constants";
-import { TFile } from "obsidian";
 
 /**
  * ChatManager - Central business logic coordinator
@@ -126,7 +128,7 @@ export class ChatManager {
       logInfo(`[ChatManager] Sending message: "${displayText}"`);
 
       // Get active note
-      const activeNote = this.plugin.app.workspace.getActiveFile();
+      const activeNote = getActiveContextFile(this.plugin.app);
 
       // If includeActiveNote is true and there's an active note, add it to context
       const updatedContext = { ...context };
@@ -204,7 +206,7 @@ export class ChatManager {
       }
 
       // Reprocess context for the edited message
-      const activeNote = this.plugin.app.workspace.getActiveFile();
+      const activeNote = getActiveContextFile(this.plugin.app);
       const systemPrompt = await this.getSystemPromptForMessage(chainType);
       await this.contextManager.reprocessMessageContext(
         messageId,

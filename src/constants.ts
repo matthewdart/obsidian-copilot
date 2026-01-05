@@ -4,8 +4,6 @@ import { v4 as uuidv4 } from "uuid";
 import { ChainType } from "./chainFactory";
 import { PromptSortStrategy } from "./types";
 
-export const BREVILABS_API_BASE_URL = "https://api.brevilabs.com/v1";
-export const BREVILABS_MODELS_BASE_URL = "https://models.brevilabs.com/v1";
 export const CHAT_VIEWTYPE = "copilot-chat-view";
 export const USER_SENDER = "user";
 export const AI_SENDER = "ai";
@@ -135,35 +133,37 @@ export const DEFAULT_MODEL_SETTING = {
   VERBOSITY: "medium",
 } as const;
 
-export enum ChatModels {
-  COPILOT_PLUS_FLASH = "copilot-plus-flash",
-  GPT_5 = "gpt-5",
-  GPT_5_mini = "gpt-5-mini",
-  GPT_5_nano = "gpt-5-nano",
-  GPT_41 = "gpt-4.1",
-  GPT_41_mini = "gpt-4.1-mini",
-  GPT_41_nano = "gpt-4.1-nano",
-  O4_mini = "o4-mini",
-  AZURE_OPENAI = "azure-openai",
-  GEMINI_PRO = "gemini-2.5-pro",
-  GEMINI_FLASH = "gemini-2.5-flash",
-  GEMINI_FLASH_LITE = "gemini-2.5-flash-lite",
-  CLAUDE_4_SONNET = "claude-sonnet-4-20250514",
-  GROK_4_FAST = "grok-4-fast",
-  GROQ_LLAMA_8b = "llama3-8b-8192",
-  COMMAND_R = "command-r",
-  MISTRAL_TINY = "mistral-tiny-latest",
-  DEEPSEEK_REASONER = "deepseek-reasoner",
-  DEEPSEEK_CHAT = "deepseek-chat",
-  OPENROUTER_GEMINI_2_5_FLASH = "google/gemini-2.5-flash",
-  OPENROUTER_GEMINI_2_5_PRO = "google/gemini-2.5-pro",
-  OPENROUTER_GEMINI_2_5_FLASH_LITE = "google/gemini-2.5-flash-lite",
-  OPENROUTER_GPT_41 = "openai/gpt-4.1",
-  OPENROUTER_GPT_41_MINI = "openai/gpt-4.1-mini",
-  OPENROUTER_GROK_4_FAST = "x-ai/grok-4-fast",
-  SILICONFLOW_DEEPSEEK_V3 = "deepseek-ai/DeepSeek-V3",
-  SILICONFLOW_DEEPSEEK_R1 = "deepseek-ai/DeepSeek-R1",
-}
+export const ChatModels = {
+  COPILOT_PLUS_FLASH: "gpt-4.1-mini",
+  GPT_5: "gpt-5",
+  GPT_5_mini: "gpt-5-mini",
+  GPT_5_nano: "gpt-5-nano",
+  GPT_41: "gpt-4.1",
+  GPT_41_mini: "gpt-4.1-mini",
+  GPT_41_nano: "gpt-4.1-nano",
+  O4_mini: "o4-mini",
+  AZURE_OPENAI: "azure-openai",
+  GEMINI_PRO: "gemini-2.5-pro",
+  GEMINI_FLASH: "gemini-2.5-flash",
+  GEMINI_FLASH_LITE: "gemini-2.5-flash-lite",
+  CLAUDE_4_SONNET: "claude-sonnet-4-20250514",
+  GROK_4_FAST: "grok-4-fast",
+  GROQ_LLAMA_8b: "llama3-8b-8192",
+  COMMAND_R: "command-r",
+  MISTRAL_TINY: "mistral-tiny-latest",
+  DEEPSEEK_REASONER: "deepseek-reasoner",
+  DEEPSEEK_CHAT: "deepseek-chat",
+  OPENROUTER_GEMINI_2_5_FLASH: "google/gemini-2.5-flash",
+  OPENROUTER_GEMINI_2_5_PRO: "google/gemini-2.5-pro",
+  OPENROUTER_GEMINI_2_5_FLASH_LITE: "google/gemini-2.5-flash-lite",
+  OPENROUTER_GPT_41: "openai/gpt-4.1",
+  OPENROUTER_GPT_41_MINI: "openai/gpt-4.1-mini",
+  OPENROUTER_GROK_4_FAST: "x-ai/grok-4-fast",
+  SILICONFLOW_DEEPSEEK_V3: "deepseek-ai/DeepSeek-V3",
+  SILICONFLOW_DEEPSEEK_R1: "deepseek-ai/DeepSeek-R1",
+} as const;
+
+export type ChatModels = (typeof ChatModels)[keyof typeof ChatModels];
 
 // Model Providers
 export enum ChatModelProviders {
@@ -200,11 +200,10 @@ export const MODEL_CAPABILITIES: Record<ModelCapability, string> = {
 export const BUILTIN_CHAT_MODELS: CustomModel[] = [
   {
     name: ChatModels.COPILOT_PLUS_FLASH,
-    provider: ChatModelProviders.COPILOT_PLUS,
+    provider: ChatModelProviders.OPENAI,
     enabled: true,
     isBuiltIn: true,
     core: true,
-    plusExclusive: true,
     projectEnabled: false,
     capabilities: [ModelCapability.VISION],
   },
@@ -385,49 +384,47 @@ export enum EmbeddingModelProviders {
   SILICONFLOW = "siliconflow",
 }
 
-export enum EmbeddingModels {
-  OPENAI_EMBEDDING_ADA_V2 = "text-embedding-ada-002",
-  OPENAI_EMBEDDING_SMALL = "text-embedding-3-small",
-  OPENAI_EMBEDDING_LARGE = "text-embedding-3-large",
-  AZURE_OPENAI = "azure-openai",
-  COHEREAI_EMBED_MULTILINGUAL_LIGHT_V3_0 = "embed-multilingual-light-v3.0",
-  GOOGLE_ENG = "text-embedding-004",
-  GOOGLE_GEMINI_EMBEDDING = "gemini-embedding-001",
-  COPILOT_PLUS_SMALL = "copilot-plus-small",
-  COPILOT_PLUS_LARGE = "copilot-plus-large",
-  COPILOT_PLUS_MULTILINGUAL = "copilot-plus-multilingual",
-  SILICONFLOW_QWEN3_EMBEDDING_0_6B = "Qwen/Qwen3-Embedding-0.6B",
-}
+export const EmbeddingModels = {
+  OPENAI_EMBEDDING_ADA_V2: "text-embedding-ada-002",
+  OPENAI_EMBEDDING_SMALL: "text-embedding-3-small",
+  OPENAI_EMBEDDING_LARGE: "text-embedding-3-large",
+  AZURE_OPENAI: "azure-openai",
+  COHEREAI_EMBED_MULTILINGUAL_LIGHT_V3_0: "embed-multilingual-light-v3.0",
+  GOOGLE_ENG: "text-embedding-004",
+  GOOGLE_GEMINI_EMBEDDING: "gemini-embedding-001",
+  COPILOT_PLUS_SMALL: "text-embedding-3-small",
+  COPILOT_PLUS_LARGE: "text-embedding-3-large",
+  COPILOT_PLUS_MULTILINGUAL: "text-embedding-3-large",
+  SILICONFLOW_QWEN3_EMBEDDING_0_6B: "Qwen/Qwen3-Embedding-0.6B",
+} as const;
+
+export type EmbeddingModels = (typeof EmbeddingModels)[keyof typeof EmbeddingModels];
 
 export const BUILTIN_EMBEDDING_MODELS: CustomModel[] = [
   {
     name: EmbeddingModels.COPILOT_PLUS_SMALL,
-    provider: EmbeddingModelProviders.COPILOT_PLUS,
+    provider: EmbeddingModelProviders.OPENAI,
     enabled: true,
     isBuiltIn: true,
     isEmbeddingModel: true,
     core: true,
-    plusExclusive: true,
   },
   {
     name: EmbeddingModels.COPILOT_PLUS_LARGE,
-    provider: EmbeddingModelProviders.COPILOT_PLUS_JINA,
+    provider: EmbeddingModelProviders.OPENAI,
     enabled: true,
     isBuiltIn: true,
     isEmbeddingModel: true,
     core: true,
-    plusExclusive: true,
-    believerExclusive: true,
     dimensions: 1024,
   },
   {
     name: EmbeddingModels.COPILOT_PLUS_MULTILINGUAL,
-    provider: EmbeddingModelProviders.COPILOT_PLUS_JINA,
+    provider: EmbeddingModelProviders.OPENAI,
     enabled: true,
     isBuiltIn: true,
     isEmbeddingModel: true,
     core: true,
-    plusExclusive: true,
     dimensions: 512,
   },
   {
@@ -611,16 +608,16 @@ export const ProviderInfo: Record<Provider, ProviderMetadata> = {
     listModelURL: "",
   },
   [EmbeddingModelProviders.COPILOT_PLUS]: {
-    label: "Copilot Plus",
-    host: BREVILABS_MODELS_BASE_URL,
-    keyManagementURL: "",
-    listModelURL: "",
+    label: "OpenAI (Copilot)",
+    host: "https://api.openai.com",
+    keyManagementURL: "https://platform.openai.com/api-keys",
+    listModelURL: "https://api.openai.com/v1/models",
   },
   [EmbeddingModelProviders.COPILOT_PLUS_JINA]: {
-    label: "Copilot Plus",
-    host: BREVILABS_MODELS_BASE_URL,
-    keyManagementURL: "",
-    listModelURL: "",
+    label: "OpenAI (Copilot)",
+    host: "https://api.openai.com",
+    keyManagementURL: "https://platform.openai.com/api-keys",
+    listModelURL: "https://api.openai.com/v1/models",
   },
 };
 
@@ -634,7 +631,7 @@ export const ProviderSettingsKeyMap: Record<SettingKeyProviders, keyof CopilotSe
   openrouterai: "openRouterAiApiKey",
   cohereai: "cohereApiKey",
   xai: "xaiApiKey",
-  "copilot-plus": "plusLicenseKey",
+  "copilot-plus": "openAIApiKey",
   mistralai: "mistralApiKey",
   deepseek: "deepseekApiKey",
   "amazon-bedrock": "amazonBedrockApiKey",
@@ -720,16 +717,16 @@ export type CommandId = (typeof COMMAND_IDS)[keyof typeof COMMAND_IDS];
 
 export const RESTRICTION_MESSAGES = {
   NON_MARKDOWN_FILES_RESTRICTED:
-    "Non-markdown files are only available in Copilot Plus mode. Please upgrade to access this file type.",
+    "Non-markdown files could not be processed for this request. Please retry or convert the file to markdown.",
   URL_PROCESSING_RESTRICTED:
-    "URL processing is only available in Copilot Plus mode. URLs will not be processed for context.",
+    "URL processing is unavailable at the moment. Please check your connection and try again.",
   UNSUPPORTED_FILE_TYPE: (extension: string) =>
     `${extension.toUpperCase()} files are not supported in the current mode.`,
 } as const;
 
 export const DEFAULT_SETTINGS: CopilotSettings = {
   userId: uuidv4(),
-  isPlusUser: false,
+  isPlusUser: true,
   plusLicenseKey: "",
   openAIApiKey: "",
   openAIOrgId: "",

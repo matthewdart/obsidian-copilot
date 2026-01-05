@@ -1,5 +1,6 @@
-import { BrevilabsClient } from "@/LLMProviders/brevilabsClient";
+import { ExternalServicesClient } from "@/LLMProviders/externalServicesClient";
 import { extractAllYoutubeUrls } from "@/utils";
+import { logError } from "@/logger";
 import { z } from "zod";
 import { createTool } from "./SimpleTool";
 
@@ -14,7 +15,7 @@ const youtubeTranscriptionTool = createTool({
   name: "youtubeTranscription",
   description: "Get transcripts of YouTube videos when the user provides YouTube URLs",
   schema: z.object({}), // Empty schema - the tool will receive _userMessageContent internally
-  isPlusOnly: true,
+  isPlusOnly: false,
   requiresUserMessageContent: true,
   handler: async (args: YouTubeHandlerArgs) => {
     // The _userMessageContent is injected by the tool execution system
@@ -50,7 +51,7 @@ const youtubeTranscriptionTool = createTool({
     const results = await Promise.all(
       urls.map(async (url) => {
         try {
-          const response = await BrevilabsClient.getInstance().youtube4llm(url);
+          const response = await ExternalServicesClient.getInstance().youtube4llm(url);
 
           // Check if transcript is empty
           if (!response.response.transcript) {
@@ -69,7 +70,7 @@ const youtubeTranscriptionTool = createTool({
             elapsed_time_ms: response.elapsed_time_ms,
           };
         } catch (error) {
-          console.error(`Error transcribing YouTube video ${url}:`, error);
+          logError(`Error transcribing YouTube video ${url}`, error);
           return {
             url,
             success: false,
