@@ -107,6 +107,212 @@ Copilot for Obsidian is an AI-powered assistant plugin that integrates various L
 - **Streaming**: Real-time streaming for LLM responses
 - **Testing**: Unit tests adjacent to implementation, integration tests for API calls
 
+## Obsidian Plugin Development Conventions (Codex Contract)
+
+Source: https://gist.github.com/matthewdart/d71c14ce36f26080c8b1c0c194c94695/raw/95749e11b38ad6116cf913a361915ac8a8d0f18a/20260106-221721.md
+
+Purpose: A normative set of conventions for developing Obsidian plugins so UI/UX is consistent, accessible, and mobile-friendly. Follow unless an explicit requirement overrides it.
+
+### 0) Scope and assumptions
+
+- Applies to: plugin UI in Obsidian desktop and mobile, settings tabs, views/panes, modals/popovers/menus.
+- Non-goals: defining features; branding beyond Obsidian theme variables.
+
+### 1) High-level principles
+
+1. Respect Obsidian native UI patterns; prefer built-in components.
+2. Mobile-first layout; assume narrow width (approx 320-420px) and maximize the primary area.
+3. Theme compatibility by default; use Obsidian CSS variables and avoid hardcoded colors/font sizes.
+4. Performance and responsiveness; avoid expensive DOM work per keystroke, debounce as needed.
+5. Accessibility; labels, focus management, keyboard navigation, adequate tap targets.
+
+### 2) UI architecture conventions
+
+#### 2.1 Use the right surface
+
+- Settings: `PluginSettingTab` with `Setting` rows.
+- Quick actions: commands (and optional ribbon icons).
+- Transient input: `Modal`.
+- Persistent content: custom `View`/`ItemView` with consistent header/content area.
+- Contextual actions: `Menu` and file/folder menus.
+
+#### 2.2 Single-responsibility UI components
+
+- Split large views into components: `HeaderBar`, `Toolbar`, `ListPane`/`DetailPane` (desktop), `Composer`, `Timeline`/`MessageList`.
+- Keep state in a single controller (e.g. ViewModel), not scattered in DOM.
+
+#### 2.3 State management
+
+- Persist only what must survive reloads in plugin settings.
+- Keep ephemeral UI state in-memory.
+- Restore UI state only when it improves UX and does not surprise users.
+
+### 3) Layout and spacing rules
+
+#### 3.1 General layout
+
+- Single-column layout for mobile and narrow panes.
+- For wide desktop views, optionally support split layouts.
+- Clear hierarchy: view header, main content, optional footer/composer.
+
+#### 3.2 Spacing and density
+
+- Prefer Obsidian defaults: `.setting-item`, `.setting-item-control`, `.setting-item-info`, `.mod-cta`.
+- Avoid cramming; minimum 12-16px padding around primary blocks.
+- Touch targets >= 44px height where feasible.
+
+#### 3.3 Scrolling
+
+- Only one primary scroll container per view.
+- Avoid nested scroll regions unless unavoidable.
+- Composer/input should be sticky/anchored without blocking content.
+
+### 4) Typography and theming
+
+#### 4.1 Typography
+
+- Use Obsidian defaults; do not hardcode fonts.
+- Use semantic headings where appropriate.
+- Keep text readable in side panes; use max-width when practical.
+
+#### 4.2 Theming
+
+- Use CSS variables: `--text-normal`, `--text-muted`, `--background-primary`, `--background-secondary`, `--interactive-accent`, `--interactive-accent-hover`, `--divider-color`.
+- Avoid hardcoded hex colors and fixed light/dark assumptions.
+
+#### 4.3 CSS scoping
+
+- All plugin CSS must be scoped to a root class (e.g. `.my-plugin`).
+- Never globally override Obsidian or theme CSS.
+
+### 5) Controls and interaction patterns
+
+#### 5.1 Buttons
+
+- One primary action per surface.
+- Secondary actions as icon buttons with tooltips.
+- Use `aria-label` for icon-only buttons.
+- Disable buttons when invalid; provide hint text.
+
+#### 5.2 Inputs
+
+- Always label inputs.
+- Placeholders are examples, not labels.
+- Multiline text uses a growing `textarea` with max height.
+
+#### 5.3 Feedback
+
+- Use `Notice` for transient success/error.
+- Inline validation for settings.
+- Loading states: skeletons or subtle spinners; do not block UI unless required.
+
+#### 5.4 Focus management
+
+- Focus the first meaningful control when opening a modal.
+- Support keyboard shortcuts; do not steal common shortcuts.
+
+### 6) Mobile-specific conventions
+
+#### 6.1 Pane constraints
+
+- Assume limited height and on-screen keyboard.
+- Keep the primary content visible when keyboard is open.
+- Use a sticky composer above the keyboard where possible.
+
+#### 6.2 Gesture and tap targets
+
+- Avoid tiny icon clusters.
+- Prefer a single overflow menu (`...`) for secondary actions.
+
+#### 6.3 Navigation
+
+- For multi-step flows, prefer single-screen progressive disclosure.
+- If multiple screens are required, provide a simple back navigation affordance.
+
+#### 6.4 Orientation
+
+- Support portrait-first; landscape must not break layout.
+
+### 7) Settings tab conventions
+
+- Use `Setting` rows (name/description left, control right).
+- Group related settings with headings and subtle dividers.
+- Provide defaults and "Reset to defaults".
+- Avoid requiring restarts; apply changes live when safe.
+
+### 8) Commands, menus, and discoverability
+
+- Every major action should have a command.
+- Ribbon icons are optional and should be sparse.
+- Context menus must include only relevant actions.
+- All icon actions must have tooltips.
+
+### 9) Error handling and resilience
+
+- Fail safe with a minimal error panel: summary, "Copy diagnostics", "Open plugin settings".
+- Do not throw uncaught errors; log with context.
+- Provide non-destructive defaults.
+
+### 10) Performance guidelines
+
+- Avoid rendering huge lists without virtualization.
+- Debounce expensive operations (search/filter).
+- Use `requestAnimationFrame` for layout-dependent UI updates.
+- Avoid blocking UI thread with large JSON parsing; chunk if needed.
+
+### 11) Security and privacy
+
+- Do not exfiltrate vault content without clear user intent.
+- External services require explicit toggles and disclosure of sent data.
+- Store secrets using Obsidian patterns; never log secrets.
+
+### 12) Codex checklist contract (must pass)
+
+#### 12.1 UI consistency
+
+- [ ] Uses native Obsidian components/patterns where applicable.
+- [ ] Uses Obsidian theme variables (no hardcoded colors/fonts).
+- [ ] Plugin CSS scoped under a root class (no global overrides).
+
+#### 12.2 Mobile support
+
+- [ ] Mobile layout works at 320px width.
+- [ ] No essential action requires hover.
+- [ ] Tap targets are comfortably sized.
+- [ ] Only one primary scroll container.
+- [ ] Composer/input not hidden by on-screen keyboard.
+
+#### 12.3 Accessibility
+
+- [ ] All inputs have labels.
+- [ ] Icon-only buttons have `aria-label`.
+- [ ] Keyboard navigation works for primary flows.
+
+#### 12.4 Performance
+
+- [ ] No expensive re-render on every keystroke (debounced where needed).
+- [ ] Large lists are virtualized or paginated.
+
+#### 12.5 Reliability
+
+- [ ] Errors show user-visible message + diagnostics.
+- [ ] No secrets in logs.
+
+### 13) Implementation notes (recommended patterns)
+
+- Prefer `this.registerEvent(...)`, `this.registerDomEvent(...)`, `this.registerInterval(...)`.
+- Use `onload`/`onunload` cleanup discipline.
+- View root: single root element with class `.my-plugin`, render into `contentEl` child.
+- Styling: keep CSS minimal; rely on Obsidian classes and variables.
+
+### 14) Quick reference: Good defaults
+
+- One primary CTA per screen.
+- Secondary actions behind `...` menu on mobile.
+- Progressive disclosure over multi-pane complexity.
+- Prefer commands for power users.
+- Respect theme variables.
+
 ## Message Management Architecture
 
 For detailed architecture diagrams and documentation, see [`MESSAGE_ARCHITECTURE.md`](./docs/MESSAGE_ARCHITECTURE.md).

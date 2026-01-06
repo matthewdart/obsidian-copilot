@@ -143,9 +143,9 @@ export const ModelEditModalContent: React.FC<ModelEditModalContentProps> = ({
               <HelpTooltip
                 content={
                   <div className="tw-flex tw-flex-col tw-gap-0.5 tw-text-sm tw-text-muted">
-                    <div className="tw-text-[12px] tw-font-bold">Suggested format:</div>
+                    <div className="tw-text-ui-smaller tw-font-bold">Suggested format:</div>
                     <div className="tw-text-accent">[Source]-[Payment]:[Pretty Model Name]</div>
-                    <div className="tw-text-[12px]">
+                    <div className="tw-text-ui-smaller">
                       Example:
                       <li>Direct-Paid:Ds-r1</li>
                       <li>OpenRouter-Paid:Ds-r1</li>

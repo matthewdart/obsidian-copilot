@@ -294,7 +294,7 @@ function ApiKeyModalContent({ onClose }: ApiKeyModalContentProps) {
                         href={providerInfo.keyManagementURL}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="tw-text-[10px] tw-text-accent hover:tw-text-accent-hover sm:tw-text-xs"
+                        className="tw-text-ui-smaller tw-text-accent hover:tw-text-accent-hover sm:tw-text-ui-small"
                       >
                         Get {getProviderLabel(item.provider)} Key
                       </a>

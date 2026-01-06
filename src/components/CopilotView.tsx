@@ -49,6 +49,7 @@ export default class CopilotView extends ItemView {
   }
 
   async onOpen(): Promise<void> {
+    this.containerEl.addClass("copilot");
     this.root = createRoot(this.containerEl.children[1]);
     const handleSaveAsNote = (saveFunction: () => Promise<void>) => {
       this.handleSaveAsNote = saveFunction;
@@ -108,5 +109,6 @@ export default class CopilotView extends ItemView {
       this.root.unmount();
       this.root = null;
     }
+    this.containerEl.removeClass("copilot");
   }
 }

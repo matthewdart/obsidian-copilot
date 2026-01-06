@@ -12,6 +12,9 @@ export class SourcesModal extends Modal {
     this.sources = sources;
   }
 
+  /**
+   * Opens the modal and renders the sources list.
+   */
   onOpen() {
     const { contentEl } = this;
     contentEl.empty();
@@ -21,28 +24,27 @@ export class SourcesModal extends Modal {
     this.createSourceList(contentEl, this.sources);
   }
 
+  /**
+   * Builds the sources list UI.
+   * @param container The container to render the list into.
+   * @param sources The sources to display.
+   */
   private createSourceList(
     container: HTMLElement,
     sources: { title: string; path: string; score: number; explanation?: any }[]
   ) {
-    const list = container.createEl("ul");
-    list.style.listStyleType = "none";
-    list.style.padding = "0";
+    const list = container.createEl("ul", { cls: "tw-list-none tw-p-0" });
 
     sources.forEach((source) => {
-      const item = list.createEl("li");
-      item.style.marginBottom = "1em";
+      const item = list.createEl("li", { cls: "tw-mb-4" });
 
       // Create collapsible container
-      const itemContainer = item.createDiv();
-      itemContainer.style.cursor = "pointer";
+      const itemContainer = item.createDiv({ cls: "tw-cursor-pointer" });
 
       // Add expand/collapse indicator
-      const expandIndicator = itemContainer.createSpan();
-      expandIndicator.style.marginRight = "0.5em";
-      expandIndicator.style.display = "inline-block";
-      expandIndicator.style.width = "1em";
-      expandIndicator.style.transition = "transform 0.2s";
+      const expandIndicator = itemContainer.createSpan({
+        cls: "tw-mr-2 tw-inline-block tw-w-4 tw-transition-transform tw-duration-200",
+      });
       expandIndicator.textContent = source.explanation ? "▶" : "";
 
       // Display title, but show path in parentheses if there are duplicates
@@ -73,30 +75,32 @@ export class SourcesModal extends Modal {
       let explanationDiv: HTMLElement | null = null;
       if (source.explanation) {
         explanationDiv = this.addExplanation(item, source.explanation);
-        explanationDiv.style.display = "none"; // Initially collapsed
+        explanationDiv.addClass("tw-hidden"); // Initially collapsed
 
         // Toggle expansion on click
         itemContainer.addEventListener("click", (e) => {
           if (e.target === link) return; // Don't toggle when clicking the link
 
           if (explanationDiv) {
-            const isExpanded = explanationDiv.style.display !== "none";
-            explanationDiv.style.display = isExpanded ? "none" : "block";
-            expandIndicator.style.transform = isExpanded ? "" : "rotate(90deg)";
+            const isExpanded = !explanationDiv.classList.contains("tw-hidden");
+            explanationDiv.classList.toggle("tw-hidden", isExpanded);
+            expandIndicator.classList.toggle("tw-rotate-90", !isExpanded);
           }
         });
       }
     });
   }
 
+  /**
+   * Creates the explanation block for a source.
+   * @param container The container to render into.
+   * @param explanation The explanation payload.
+   * @returns The created explanation element.
+   */
   private addExplanation(container: HTMLElement, explanation: any): HTMLElement {
-    const explanationDiv = container.createDiv({ cls: "search-explanation" });
-    explanationDiv.style.marginTop = "0.5em";
-    explanationDiv.style.marginLeft = "2.5em";
-    explanationDiv.style.fontSize = "0.9em";
-    explanationDiv.style.color = "var(--text-muted)";
-    explanationDiv.style.borderLeft = "2px solid var(--background-modifier-border)";
-    explanationDiv.style.paddingLeft = "0.5em";
+    const explanationDiv = container.createDiv({
+      cls: "tw-mt-2 tw-ml-10 tw-text-ui-small tw-text-muted tw-border-l tw-border-solid tw-border-border tw-pl-2",
+    });
 
     const details: string[] = [];
 
@@ -153,8 +157,7 @@ export class SourcesModal extends Modal {
     // Create explanation text without "Why this ranked here:" header
     if (details.length > 0) {
       details.forEach((detail) => {
-        const detailDiv = explanationDiv.createEl("div");
-        detailDiv.style.marginBottom = "0.25em";
+        const detailDiv = explanationDiv.createEl("div", { cls: "tw-mb-1" });
         detailDiv.textContent = `• ${detail}`;
       });
     }
@@ -162,6 +165,9 @@ export class SourcesModal extends Modal {
     return explanationDiv;
   }
 
+  /**
+   * Clears the modal content on close.
+   */
   onClose() {
     const { contentEl } = this;
     contentEl.empty();

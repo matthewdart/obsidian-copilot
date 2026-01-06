@@ -45,7 +45,7 @@ function ProjectItem({
 }) {
   return (
     <div
-      className="tw-group tw-flex tw-cursor-pointer tw-items-center tw-justify-between tw-gap-2 tw-rounded-lg tw-border tw-border-solid tw-border-border tw-p-3 tw-transition-all tw-duration-200 tw-bg-secondary/40 hover:tw-border-interactive-accent hover:tw-text-accent hover:tw-shadow-[0_2px_12px_rgba(0,0,0,0.1)] active:tw-scale-[0.98]"
+      className="tw-group tw-flex tw-cursor-pointer tw-items-center tw-justify-between tw-gap-2 tw-rounded-lg tw-border tw-border-solid tw-border-border tw-p-3 tw-transition-all tw-duration-200 tw-bg-secondary/40 hover:tw-border-interactive-accent hover:tw-text-accent hover:tw-shadow-[var(--shadow-m)] active:tw-scale-[0.98]"
       onClick={() => loadContext(project)}
     >
       <div className="tw-flex tw-flex-1 tw-items-center tw-gap-2 tw-overflow-hidden">
@@ -53,11 +53,11 @@ function ProjectItem({
           <Folder className="tw-size-4" />
         </div>
         <div className="tw-flex tw-flex-1 tw-flex-col tw-gap-1.5 tw-overflow-hidden">
-          <span className="tw-w-full tw-truncate tw-text-[13px] tw-font-medium tw-text-normal">
+          <span className="tw-w-full tw-truncate tw-text-ui-small tw-font-medium tw-text-normal">
             {project.name}
           </span>
           {project.description && (
-            <span className="tw-w-full tw-truncate tw-text-[12px] tw-text-muted/80">
+            <span className="tw-w-full tw-truncate tw-text-ui-smaller tw-text-muted/80">
               {project.description}
             </span>
           )}

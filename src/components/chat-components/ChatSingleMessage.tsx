@@ -249,7 +249,7 @@ const ChatSingleMessage: React.FC<ChatSingleMessageProps> = ({
       ): string => {
         // Common styles as template strings
         const detailsStyle = `margin: 0.5rem 0 1.5rem; padding: 0.75rem; border: 1px solid var(--background-modifier-border); border-radius: 4px; background-color: var(--background-secondary)`;
-        const summaryStyle = `cursor: pointer; color: var(--text-muted); font-size: 0.8em; margin-bottom: 0.5rem; user-select: none`;
+        const summaryStyle = `cursor: pointer; color: var(--text-muted); font-size: var(--font-ui-smaller); margin-bottom: 0.5rem; user-select: none`;
         const contentStyle = `margin-top: 0.75rem; padding: 0.75rem; border-radius: 4px; background-color: var(--background-primary)`;
 
         const openTag = `<${tagName}>`;

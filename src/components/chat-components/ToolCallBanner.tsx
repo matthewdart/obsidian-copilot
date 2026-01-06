@@ -101,7 +101,7 @@ export const ToolCallBanner: React.FC<ToolCallBannerProps> = ({
               className="tw-absolute tw-inset-0 -tw-translate-x-full"
               style={{
                 background:
-                  "linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.3) 50%, transparent 100%)",
+                  "linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--text-normal) 30%, transparent) 50%, transparent 100%)",
                 animation: SHIMMER_ANIMATION,
               }}
             />
