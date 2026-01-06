@@ -876,6 +876,8 @@ If your plugin does not need CSS, delete this file.
 
 /* use 'important' to prevent ob default css style from being third-party theme overridden */
 .workspace-leaf-content[data-type="copilot-chat-view"] .view-content {
+  font-size: var(--font-ui-small);
+  --font-text-size: var(--font-ui-small);
   padding-bottom: max(var(--safe-area-inset-bottom), var(--size-4-8)) !important;
 }
 

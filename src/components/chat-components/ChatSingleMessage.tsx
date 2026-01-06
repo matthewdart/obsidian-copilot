@@ -648,7 +648,7 @@ const ChatSingleMessage: React.FC<ChatSingleMessageProps> = ({
               return (
                 <div key={index}>
                   {message.sender === USER_SENDER ? (
-                    <div className="tw-whitespace-pre-wrap tw-break-words tw-text-[calc(var(--font-text-size)_-_2px)] tw-font-normal">
+                    <div className="tw-whitespace-pre-wrap tw-break-words tw-text-base tw-font-normal">
                       {message.message}
                     </div>
                   ) : (
@@ -678,7 +678,7 @@ const ChatSingleMessage: React.FC<ChatSingleMessageProps> = ({
 
     // Fallback for messages without content array
     return message.sender === USER_SENDER ? (
-      <div className="tw-whitespace-pre-wrap tw-break-words tw-text-[calc(var(--font-text-size)_-_2px)] tw-font-normal">
+      <div className="tw-whitespace-pre-wrap tw-break-words tw-text-base tw-font-normal">
         {message.message}
       </div>
     ) : (

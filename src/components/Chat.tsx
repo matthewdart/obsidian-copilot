@@ -2,7 +2,6 @@ import {
   clearSelectedTextContexts,
   getCurrentProject,
   ProjectConfig,
-  removeSelectedTextContext,
   setCurrentProject,
   useChainType,
   useModelKey,
@@ -12,7 +11,7 @@ import { ChainType } from "@/chainFactory";
 import { useProjectContextStatus } from "@/hooks/useProjectContextStatus";
 import { logInfo, logError } from "@/logger";
 
-import { ChatControls, reloadCurrentProject } from "@/components/chat-components/ChatControls";
+import { reloadCurrentProject } from "@/components/chat-components/ChatControls";
 import ChatInput from "@/components/chat-components/ChatInput";
 import ChatMessages from "@/components/chat-components/ChatMessages";
 import { NewVersionBanner } from "@/components/chat-components/NewVersionBanner";
@@ -538,10 +537,6 @@ const ChatInternal: React.FC<ChatProps & { chatInput: ReturnType<typeof useChatI
     [settings.projectList]
   );
 
-  const handleRemoveSelectedText = useCallback((id: string) => {
-    removeSelectedTextContext(id);
-  }, []);
-
   useEffect(() => {
     const handleChatVisibility = () => {
       chatInput.focusInput();
@@ -755,7 +750,21 @@ const ChatInternal: React.FC<ChatProps & { chatInput: ReturnType<typeof useChatI
           </div>
         ) : (
           <>
-            <ChatControls
+            <ChatInput
+              inputMessage={inputMessage}
+              setInputMessage={setInputMessage}
+              handleSendMessage={handleSendMessage}
+              isGenerating={loading}
+              onStopGenerating={() => handleStopGenerating(ABORT_REASON.USER_STOPPED)}
+              app={app}
+              contextNotes={contextNotes}
+              setContextNotes={setContextNotes}
+              includeActiveNote={includeActiveNote}
+              setIncludeActiveNote={setIncludeActiveNote}
+              selectedImages={selectedImages}
+              onAddImage={(files: File[]) => setSelectedImages((prev) => [...prev, ...files])}
+              setSelectedImages={setSelectedImages}
+              disableModelSwitch={selectedChain === ChainType.PROJECT_CHAIN}
               onNewChat={handleNewChat}
               onSaveAsNote={() => handleSaveAsNote()}
               onLoadHistory={handleLoadChatHistory}
@@ -772,27 +781,6 @@ const ChatInternal: React.FC<ChatProps & { chatInput: ReturnType<typeof useChatI
               onLoadChat={handleLoadChat}
               onOpenSourceFile={handleOpenSourceFile}
               latestTokenCount={latestTokenCount}
-            />
-            <ChatInput
-              inputMessage={inputMessage}
-              setInputMessage={setInputMessage}
-              handleSendMessage={handleSendMessage}
-              isGenerating={loading}
-              onStopGenerating={() => handleStopGenerating(ABORT_REASON.USER_STOPPED)}
-              app={app}
-              contextNotes={contextNotes}
-              setContextNotes={setContextNotes}
-              includeActiveNote={includeActiveNote}
-              setIncludeActiveNote={setIncludeActiveNote}
-              selectedImages={selectedImages}
-              onAddImage={(files: File[]) => setSelectedImages((prev) => [...prev, ...files])}
-              setSelectedImages={setSelectedImages}
-              disableModelSwitch={selectedChain === ChainType.PROJECT_CHAIN}
-              selectedTextContexts={selectedTextContexts}
-              onRemoveSelectedText={handleRemoveSelectedText}
-              showProgressCard={() => {
-                setProgressCardVisible(true);
-              }}
             />
           </>
         )}

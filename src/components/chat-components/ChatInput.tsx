@@ -1,33 +1,38 @@
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { ArrowUp, Loader2, MoreHorizontal, StopCircle, X } from "lucide-react";
+import { App, Menu, Notice, TFile } from "obsidian";
+
 import {
   getCurrentProject,
   ProjectConfig,
+  setCurrentProject,
   subscribeToProjectChange,
   useChainType,
   useModelKey,
   useProjectLoading,
 } from "@/aiParams";
 import { ChainType } from "@/chainFactory";
+import {
+  forceRebuildCurrentProjectContext,
+  forceReindexVault,
+  refreshVaultIndex,
+  reloadCurrentProject,
+} from "@/components/chat-components/ChatControls";
+import {
+  ChatHistoryPopover,
+  ChatHistoryItem,
+} from "@/components/chat-components/ChatHistoryPopover";
+import LexicalEditor from "@/components/chat-components/LexicalEditor";
+import { $removePillsByToolName } from "@/components/chat-components/pills/ToolPillNode";
 import { AddImageModal } from "@/components/modals/AddImageModal";
+import { ConfirmModal } from "@/components/modals/ConfirmModal";
 import { Button } from "@/components/ui/button";
-import { ModelSelector } from "@/components/ui/ModelSelector";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ChatToolControls } from "./ChatToolControls";
-import { isPlusChain } from "@/utils";
-
-import { useSettingsValue } from "@/settings/model";
-import { SelectedTextContext } from "@/types/message";
+import { getModelDisplayText } from "@/components/ui/model-display";
 import { useActiveFile as useWorkspaceActiveFile } from "@/hooks/useActiveFile";
-import { CornerDownLeft, Image, Loader2, StopCircle, X } from "lucide-react";
-import { App, Notice, TFile } from "obsidian";
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import { $getSelection, $isRangeSelection } from "lexical";
-import { ContextControl } from "./ContextControl";
-import { $removePillsByPath } from "./pills/NotePillNode";
-import { $removeActiveNotePills } from "./pills/ActiveNotePillNode";
-import { $removePillsByURL } from "./pills/URLPillNode";
-import { $removePillsByFolder } from "./pills/FolderPillNode";
-import { $removePillsByToolName, $createToolPillNode } from "./pills/ToolPillNode";
-import LexicalEditor from "./LexicalEditor";
+import { navigateToPlusPage, useIsPlusUser } from "@/plusUtils";
+import { useSettingsValue, updateSetting, getModelKeyFromModel } from "@/settings/model";
+import { checkModelApiKey, isPlusChain } from "@/utils";
+import { PLUS_UTM_MEDIUMS } from "@/constants";
 
 interface ChatInputProps {
   inputMessage: string;
@@ -49,9 +54,17 @@ interface ChatInputProps {
   onAddImage: (files: File[]) => void;
   setSelectedImages: React.Dispatch<React.SetStateAction<File[]>>;
   disableModelSwitch?: boolean;
-  selectedTextContexts?: SelectedTextContext[];
-  onRemoveSelectedText?: (id: string) => void;
-  showProgressCard: () => void;
+  onNewChat?: () => void;
+  onSaveAsNote?: () => void;
+  onLoadHistory?: () => void;
+  chatHistory?: ChatHistoryItem[];
+  onUpdateChatTitle?: (id: string, newTitle: string) => Promise<void>;
+  onDeleteChat?: (id: string) => Promise<void>;
+  onLoadChat?: (id: string) => Promise<void>;
+  onOpenSourceFile?: (id: string) => Promise<void>;
+  onModeChange?: (mode: ChainType) => void;
+  onCloseProject?: () => void;
+  latestTokenCount?: number | null;
 
   // Edit mode props
   editMode?: boolean;
@@ -86,9 +99,17 @@ const ChatInput: React.FC<ChatInputProps> = ({
   onAddImage,
   setSelectedImages,
   disableModelSwitch,
-  selectedTextContexts,
-  onRemoveSelectedText,
-  showProgressCard,
+  onNewChat,
+  onSaveAsNote,
+  onLoadHistory,
+  chatHistory,
+  onUpdateChatTitle,
+  onDeleteChat,
+  onLoadChat,
+  onOpenSourceFile,
+  onModeChange,
+  onCloseProject,
+  latestTokenCount,
   editMode = false,
   onEditSave,
   onEditCancel,
@@ -99,9 +120,10 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const lexicalEditorRef = useRef<any>(null);
   const [currentModelKey, setCurrentModelKey] = useModelKey();
-  const [currentChain] = useChainType();
+  const [currentChain, setCurrentChain] = useChainType();
   const [isProjectLoading] = useProjectLoading();
   const settings = useSettingsValue();
+  const isPlusUser = useIsPlusUser();
   const currentActiveNote = useWorkspaceActiveFile();
   const [selectedProject, setSelectedProject] = useState<ProjectConfig | null>(null);
   const [notesFromPills, setNotesFromPills] = useState<{ path: string; basename: string }[]>([]);
@@ -109,6 +131,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const [foldersFromPills, setFoldersFromPills] = useState<string[]>([]);
   const [toolsFromPills, setToolsFromPills] = useState<string[]>([]);
   const isCopilotPlus = isPlusChain(currentChain);
+  const showAutonomousAgent = isCopilotPlus && currentChain !== ChainType.PROJECT_CHAIN;
 
   // Toggle states for vault, web search, composer, and autonomous agent
   const [vaultToggle, setVaultToggle] = useState(false);
@@ -123,6 +146,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
     "Processing context files...",
     "If you have many files in context, this can take a while...",
   ];
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
   // Sync autonomous agent toggle with settings and chain type
   useEffect(() => {
@@ -171,6 +195,330 @@ const ChatInput: React.FC<ChatInputProps> = ({
     }
     return currentModelKey;
   };
+  const displayModelKey = getDisplayModelKey();
+  const currentModel = settings.activeModels.find(
+    (model) => model.enabled && getModelKeyFromModel(model) === displayModelKey
+  );
+  const currentModelLabel = currentModel ? getModelDisplayText(currentModel) : "Select model";
+  const canShowHistory = Boolean(onLoadHistory && chatHistory && onUpdateChatTitle && onDeleteChat);
+  const showOptionsMenu = !editMode;
+  const canSaveAsNote = Boolean(onSaveAsNote && !settings.autosaveChat);
+
+  /**
+   * Removes vault tool pills when vault search is toggled off.
+   */
+  const handleVaultToggleOff = useCallback(() => {
+    if (lexicalEditorRef.current && isCopilotPlus) {
+      lexicalEditorRef.current.update(() => {
+        $removePillsByToolName("@vault");
+      });
+    }
+  }, [isCopilotPlus]);
+
+  /**
+   * Removes web search tool pills when web search is toggled off.
+   */
+  const handleWebToggleOff = useCallback(() => {
+    if (lexicalEditorRef.current && isCopilotPlus) {
+      lexicalEditorRef.current.update(() => {
+        $removePillsByToolName("@websearch");
+        $removePillsByToolName("@web");
+      });
+    }
+  }, [isCopilotPlus]);
+
+  /**
+   * Removes composer tool pills when composer is toggled off.
+   */
+  const handleComposerToggleOff = useCallback(() => {
+    if (lexicalEditorRef.current && isCopilotPlus) {
+      lexicalEditorRef.current.update(() => {
+        $removePillsByToolName("@composer");
+      });
+    }
+  }, [isCopilotPlus]);
+
+  /**
+   * Updates the chain selection and clears project state when leaving project mode.
+   * @param chainType The chain type to select.
+   */
+  const handleModeSelect = useCallback(
+    (chainType: ChainType) => {
+      setCurrentChain(chainType);
+      onModeChange?.(chainType);
+      if (chainType !== ChainType.PROJECT_CHAIN) {
+        setCurrentProject(null);
+        onCloseProject?.();
+      }
+    },
+    [onModeChange, onCloseProject, setCurrentChain]
+  );
+
+  /**
+   * Opens the system chat options menu anchored to the trigger click.
+   * @param event The click event from the menu trigger button.
+   */
+  const handleOpenOptionsMenu = useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      event.preventDefault();
+      const menu = new Menu();
+
+      if (onNewChat) {
+        menu.addItem((item) => {
+          item.setTitle("New chat").onClick(() => onNewChat());
+        });
+      }
+
+      if (canSaveAsNote) {
+        menu.addItem((item) => {
+          item.setTitle("Save chat as note").onClick(() => onSaveAsNote?.());
+        });
+      }
+
+      if (canShowHistory) {
+        menu.addItem((item) => {
+          item.setTitle("Chat history").onClick(() => {
+            onLoadHistory?.();
+            setIsHistoryOpen(true);
+          });
+        });
+      }
+
+      menu.addItem((item) => {
+        item.setTitle("Add image(s)").onClick(() => {
+          new AddImageModal(app, onAddImage).open();
+        });
+      });
+
+      if (latestTokenCount !== null && latestTokenCount !== undefined) {
+        menu.addItem((item) => {
+          item.setTitle(`Context used: ${latestTokenCount.toLocaleString()}`).setDisabled(true);
+        });
+      }
+
+      menu.addSeparator();
+
+      menu.addItem((item) => {
+        item.setTitle("Mode");
+        (item as any).setSubmenu();
+        const submenu = (item as any).submenu;
+        if (!submenu) {
+          return;
+        }
+
+        submenu.addItem((subItem: any) => {
+          subItem
+            .setTitle("Chat (free)")
+            .setChecked(currentChain === ChainType.LLM_CHAIN)
+            .onClick(() => handleModeSelect(ChainType.LLM_CHAIN));
+        });
+        submenu.addItem((subItem: any) => {
+          subItem
+            .setTitle("Vault QA (free)")
+            .setChecked(currentChain === ChainType.VAULT_QA_CHAIN)
+            .onClick(() => handleModeSelect(ChainType.VAULT_QA_CHAIN));
+        });
+
+        if (isPlusUser) {
+          submenu.addItem((subItem: any) => {
+            subItem
+              .setTitle("Copilot Plus")
+              .setChecked(currentChain === ChainType.COPILOT_PLUS_CHAIN)
+              .onClick(() => handleModeSelect(ChainType.COPILOT_PLUS_CHAIN));
+          });
+          submenu.addItem((subItem: any) => {
+            subItem
+              .setTitle("Projects (alpha)")
+              .setChecked(currentChain === ChainType.PROJECT_CHAIN)
+              .onClick(() => handleModeSelect(ChainType.PROJECT_CHAIN));
+          });
+        } else {
+          submenu.addItem((subItem: any) => {
+            subItem.setTitle("Copilot Plus").onClick(() => {
+              navigateToPlusPage(PLUS_UTM_MEDIUMS.CHAT_MODE_SELECT);
+              onCloseProject?.();
+            });
+          });
+          submenu.addItem((subItem: any) => {
+            subItem.setTitle("Projects (alpha)").onClick(() => {
+              navigateToPlusPage(PLUS_UTM_MEDIUMS.CHAT_MODE_SELECT);
+              onCloseProject?.();
+            });
+          });
+        }
+      });
+
+      menu.addItem((item) => {
+        item.setTitle(`Model: ${currentModelLabel}`);
+
+        if (disableModelSwitch) {
+          item.setDisabled(true);
+          return;
+        }
+
+        (item as any).setSubmenu();
+        const submenu = (item as any).submenu;
+        if (!submenu) {
+          return;
+        }
+
+        settings.activeModels
+          .filter((model) => model.enabled)
+          .forEach((model) => {
+            const { hasApiKey, errorNotice } = checkModelApiKey(model, settings);
+            const modelKey = getModelKeyFromModel(model);
+            submenu.addItem((subItem: any) => {
+              subItem
+                .setTitle(getModelDisplayText(model))
+                .setChecked(modelKey === displayModelKey)
+                .setDisabled(!hasApiKey)
+                .onClick(() => {
+                  if (!hasApiKey) {
+                    if (errorNotice) {
+                      new Notice(errorNotice);
+                    }
+                    return;
+                  }
+                  if (currentChain !== ChainType.PROJECT_CHAIN) {
+                    setCurrentModelKey(modelKey);
+                  }
+                });
+            });
+          });
+      });
+
+      if (isCopilotPlus) {
+        menu.addSeparator();
+
+        if (showAutonomousAgent) {
+          menu.addItem((item) => {
+            item
+              .setTitle("Autonomous agent")
+              .setChecked(autonomousAgentToggle)
+              .onClick(() => {
+                const isEnabled = !autonomousAgentToggle;
+                setAutonomousAgentToggle(isEnabled);
+                updateSetting("enableAutonomousAgent", isEnabled);
+              });
+          });
+        }
+
+        menu.addItem((item) => {
+          item
+            .setTitle("Vault search")
+            .setChecked(vaultToggle)
+            .setDisabled(autonomousAgentToggle)
+            .onClick(() => {
+              const isEnabled = !vaultToggle;
+              setVaultToggle(isEnabled);
+              if (!isEnabled) {
+                handleVaultToggleOff();
+              }
+            });
+        });
+        menu.addItem((item) => {
+          item
+            .setTitle("Web search")
+            .setChecked(webToggle)
+            .setDisabled(autonomousAgentToggle)
+            .onClick(() => {
+              const isEnabled = !webToggle;
+              setWebToggle(isEnabled);
+              if (!isEnabled) {
+                handleWebToggleOff();
+              }
+            });
+        });
+        menu.addItem((item) => {
+          item
+            .setTitle("Composer")
+            .setChecked(composerToggle)
+            .setDisabled(autonomousAgentToggle)
+            .onClick(() => {
+              const isEnabled = !composerToggle;
+              setComposerToggle(isEnabled);
+              if (!isEnabled) {
+                handleComposerToggleOff();
+              }
+            });
+        });
+      }
+
+      menu.addSeparator();
+      menu.addItem((item) => {
+        item
+          .setTitle("Suggested prompts")
+          .setChecked(settings.showSuggestedPrompts)
+          .onClick(() => updateSetting("showSuggestedPrompts", !settings.showSuggestedPrompts));
+      });
+      menu.addItem((item) => {
+        item
+          .setTitle("Relevant notes")
+          .setChecked(settings.showRelevantNotes)
+          .onClick(() => updateSetting("showRelevantNotes", !settings.showRelevantNotes));
+      });
+
+      menu.addSeparator();
+      if (currentChain === ChainType.PROJECT_CHAIN) {
+        menu.addItem((item) => {
+          item.setTitle("Reload current project").onClick(() => reloadCurrentProject());
+        });
+        menu.addItem((item) => {
+          item.setTitle("Force rebuild context").onClick(() => forceRebuildCurrentProjectContext());
+        });
+      } else {
+        menu.addItem((item) => {
+          item.setTitle("Refresh vault index").onClick(() => refreshVaultIndex());
+        });
+        menu.addItem((item) => {
+          item.setTitle("Force reindex vault").onClick(() => {
+            const modal = new ConfirmModal(
+              app,
+              () => forceReindexVault(),
+              "This will delete and rebuild your entire vault index from scratch. This operation cannot be undone. Are you sure you want to proceed?",
+              "Force Reindex Vault"
+            );
+            modal.open();
+          });
+        });
+      }
+
+      menu.showAtMouseEvent(event.nativeEvent);
+    },
+    [
+      app,
+      canSaveAsNote,
+      canShowHistory,
+      autonomousAgentToggle,
+      composerToggle,
+      currentChain,
+      currentModelLabel,
+      disableModelSwitch,
+      displayModelKey,
+      handleComposerToggleOff,
+      handleModeSelect,
+      handleVaultToggleOff,
+      handleWebToggleOff,
+      isCopilotPlus,
+      isPlusUser,
+      latestTokenCount,
+      onAddImage,
+      onCloseProject,
+      onLoadHistory,
+      onNewChat,
+      onSaveAsNote,
+      setAutonomousAgentToggle,
+      setComposerToggle,
+      setCurrentModelKey,
+      setIsHistoryOpen,
+      setVaultToggle,
+      setWebToggle,
+      settings,
+      showAutonomousAgent,
+      vaultToggle,
+      webToggle,
+    ]
+  );
 
   const onSendMessage = () => {
     // Handle edit mode
@@ -276,147 +624,6 @@ const ChatInput: React.FC<ChatInputProps> = ({
     setComposerToggle(hasComposer);
   }, [toolsFromPills, isCopilotPlus, autonomousAgentToggle]);
 
-  // Handle when context notes are removed from the context menu
-  // This should remove all corresponding pills from the editor
-  const handleContextNoteRemoved = (notePath: string) => {
-    if (lexicalEditorRef.current) {
-      lexicalEditorRef.current.update(() => {
-        $removePillsByPath(notePath);
-      });
-    }
-
-    // Also immediately update notesFromPills to prevent stale data from re-adding the note
-    setNotesFromPills((prev) => prev.filter((note) => note.path !== notePath));
-  };
-
-  // Handle when context URLs are removed from the context menu
-  // This should remove all corresponding URL pills from the editor
-  const handleURLContextRemoved = (url: string) => {
-    if (lexicalEditorRef.current) {
-      lexicalEditorRef.current.update(() => {
-        $removePillsByURL(url);
-      });
-    }
-
-    // Also immediately update urlsFromPills to prevent stale data from re-adding the URL
-    setUrlsFromPills((prev) => prev.filter((pillUrl) => pillUrl !== url));
-  };
-
-  // Handle when context folders are removed from the context menu
-  // This should remove all corresponding folder pills from the editor
-  const handleFolderContextRemoved = (folderPath: string) => {
-    if (lexicalEditorRef.current) {
-      lexicalEditorRef.current.update(() => {
-        $removePillsByFolder(folderPath);
-      });
-    }
-
-    // Also immediately update foldersFromPills to prevent stale data from re-adding the folder
-    setFoldersFromPills((prev) => prev.filter((pillFolder) => pillFolder !== folderPath));
-  };
-
-  // Unified handler for adding to context (from popover @ mention)
-  const handleAddToContext = (category: string, data: any) => {
-    switch (category) {
-      case "activeNote":
-        // Set active note context flag (no pill needed - context badge shows it)
-        setIncludeActiveNote(true);
-        break;
-      case "notes":
-        if (data instanceof TFile) {
-          if (currentActiveNote && data.path === currentActiveNote.path) {
-            setIncludeActiveNote(true);
-            setContextNotes((prev) => prev.filter((n) => n.path !== data.path));
-          } else {
-            setContextNotes((prev) => {
-              const existingNote = prev.find((n) => n.path === data.path);
-              if (existingNote) {
-                return prev; // Note already exists, no change needed
-              } else {
-                return [...prev, data];
-              }
-            });
-          }
-        }
-        break;
-      case "tools":
-        // Add tool pill to lexical editor when selected from @ mention typeahead
-        if (typeof data === "string" && lexicalEditorRef.current) {
-          lexicalEditorRef.current.update(() => {
-            // Insert tool pill at current cursor position
-            const selection = $getSelection();
-            if ($isRangeSelection(selection)) {
-              const toolPill = $createToolPillNode(data);
-              selection.insertNodes([toolPill]);
-            }
-          });
-          // Note: toolsFromPills will be updated automatically via ToolPillSyncPlugin
-        }
-        break;
-      case "folders":
-        // For folders from context menu, update contextFolders directly (no pills in editor)
-        if (data && data.path) {
-          const folderPath = data.path;
-          setContextFolders((prev) => {
-            const exists = prev.find((f) => f === folderPath);
-            if (!exists) {
-              return [...prev, folderPath];
-            }
-            return prev;
-          });
-        }
-        break;
-    }
-  };
-
-  // Unified handler for removing from context (from context menu badges)
-  const handleRemoveFromContext = (category: string, data: any) => {
-    switch (category) {
-      case "activeNote":
-        // Remove active note pill from editor and turn off flag
-        setIncludeActiveNote(false);
-        if (lexicalEditorRef.current) {
-          lexicalEditorRef.current.update(() => {
-            $removeActiveNotePills();
-          });
-        }
-        break;
-      case "notes":
-        if (typeof data === "string") {
-          // data is the path
-          // Check if this is the active note
-          if (currentActiveNote?.path === data && includeActiveNote) {
-            setIncludeActiveNote(false);
-          } else {
-            // Remove from contextNotes
-            setContextNotes((prev) => prev.filter((note) => note.path !== data));
-          }
-          // Also remove corresponding pills from editor
-          handleContextNoteRemoved(data);
-        }
-        break;
-      case "urls":
-        if (typeof data === "string") {
-          setContextUrls((prev) => prev.filter((u) => u !== data));
-          handleURLContextRemoved(data);
-        }
-        break;
-      case "folders":
-        if (typeof data === "string") {
-          // data is the path
-          setContextFolders((prev) => prev.filter((f) => f !== data));
-          handleFolderContextRemoved(data);
-        }
-        break;
-      case "selectedText":
-        if (typeof data === "string") {
-          // data is the id
-          onRemoveSelectedText?.(data);
-        }
-        break;
-    }
-  };
-
   // Handle when folders are removed from pills (when pills are deleted in editor)
   const handleFolderPillsRemoved = (removedFolders: string[]) => {
     const removedFolderPaths = new Set(removedFolders);
@@ -515,32 +722,6 @@ const ChatInput: React.FC<ChatInputProps> = ({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [editMode, onEditCancel]);
 
-  // Handle tool button toggle-off events - remove corresponding pills
-  const handleVaultToggleOff = useCallback(() => {
-    if (lexicalEditorRef.current && isCopilotPlus) {
-      lexicalEditorRef.current.update(() => {
-        $removePillsByToolName("@vault");
-      });
-    }
-  }, [isCopilotPlus]);
-
-  const handleWebToggleOff = useCallback(() => {
-    if (lexicalEditorRef.current && isCopilotPlus) {
-      lexicalEditorRef.current.update(() => {
-        $removePillsByToolName("@websearch");
-        $removePillsByToolName("@web");
-      });
-    }
-  }, [isCopilotPlus]);
-
-  const handleComposerToggleOff = useCallback(() => {
-    if (lexicalEditorRef.current && isCopilotPlus) {
-      lexicalEditorRef.current.update(() => {
-        $removePillsByToolName("@composer");
-      });
-    }
-  }, [isCopilotPlus]);
-
   // Active note pill sync callbacks
   const handleActiveNoteAdded = useCallback(() => {
     setIncludeActiveNote(true);
@@ -560,22 +741,9 @@ const ChatInput: React.FC<ChatInputProps> = ({
 
   return (
     <div
-      className="tw-flex tw-w-full tw-flex-col tw-gap-0.5 tw-rounded-md tw-border tw-border-solid tw-border-border tw-px-1 tw-pb-1 tw-pt-2 tw-@container/chat-input"
+      className="tw-flex tw-w-full tw-flex-col tw-gap-0.5 tw-rounded-md tw-border tw-border-solid tw-border-border tw-p-1 tw-@container/chat-input"
       ref={containerRef}
     >
-      <ContextControl
-        contextNotes={contextNotes}
-        includeActiveNote={includeActiveNote}
-        activeNote={currentActiveNote}
-        contextUrls={contextUrls}
-        contextFolders={contextFolders}
-        selectedTextContexts={selectedTextContexts}
-        showProgressCard={showProgressCard}
-        lexicalEditorRef={lexicalEditorRef}
-        onAddToContext={handleAddToContext}
-        onRemoveFromContext={handleRemoveFromContext}
-      />
-
       {selectedImages.length > 0 && (
         <div className="selected-images">
           {selectedImages.map((file, index) => (
@@ -606,121 +774,87 @@ const ChatInput: React.FC<ChatInputProps> = ({
             </div>
           </div>
         )}
-        <LexicalEditor
-          value={inputMessage}
-          onChange={(value) => setInputMessage(value)}
-          onSubmit={onSendMessage}
-          onNotesChange={setNotesFromPills}
-          onNotesRemoved={handleNotePillsRemoved}
-          onActiveNoteAdded={handleActiveNoteAdded}
-          onActiveNoteRemoved={handleActiveNoteRemoved}
-          onURLsChange={isCopilotPlus ? setUrlsFromPills : undefined}
-          onURLsRemoved={isCopilotPlus ? handleURLPillsRemoved : undefined}
-          onToolsChange={isCopilotPlus ? setToolsFromPills : undefined}
-          onToolsRemoved={isCopilotPlus ? handleToolPillsRemoved : undefined}
-          onFoldersChange={setFoldersFromPills}
-          onFoldersRemoved={handleFolderPillsRemoved}
-          onEditorReady={onEditorReady}
-          onImagePaste={onAddImage}
-          onTagSelected={handleTagSelected}
-          placeholder={"Your AI assistant for Obsidian • @ to add context • / for custom prompts"}
-          disabled={isProjectLoading}
-          isCopilotPlus={isCopilotPlus}
-          currentActiveFile={currentActiveNote}
-          currentChain={currentChain}
-        />
-      </div>
-
-      <div className="tw-flex tw-h-6 tw-justify-between tw-gap-1 tw-px-1">
-        {isGenerating ? (
-          <div className="tw-flex tw-items-center tw-gap-1 tw-px-1 tw-text-sm tw-text-muted">
-            <Loader2 className="tw-size-3 tw-animate-spin" />
-            <span>Generating...</span>
-          </div>
-        ) : (
-          <div className="tw-min-w-0 tw-flex-1">
-            <ModelSelector
-              variant="ghost2"
-              size="fit"
-              disabled={disableModelSwitch}
-              value={getDisplayModelKey()}
-              onChange={(modelKey) => {
-                // In project mode, we don't update the global model key
-                // as the project model takes precedence
-                if (currentChain !== ChainType.PROJECT_CHAIN) {
-                  setCurrentModelKey(modelKey);
-                }
-              }}
-              className="tw-max-w-full tw-truncate"
-            />
-          </div>
+        {showOptionsMenu && canShowHistory && (
+          <ChatHistoryPopover
+            open={isHistoryOpen}
+            onOpenChange={setIsHistoryOpen}
+            chatHistory={chatHistory ?? []}
+            onUpdateTitle={onUpdateChatTitle!}
+            onDeleteChat={onDeleteChat!}
+            onLoadChat={onLoadChat}
+            onOpenSourceFile={onOpenSourceFile}
+            anchorClassName="tw-absolute tw-right-2 tw-bottom-2"
+          />
         )}
-
-        <div className="tw-flex tw-items-center tw-gap-1">
-          {isGenerating ? (
-            <Button
-              variant="ghost2"
-              size="fit"
-              className="tw-text-muted"
-              onClick={() => onStopGenerating()}
-            >
-              <StopCircle className="tw-size-4" />
-              Stop
-            </Button>
-          ) : (
-            <>
-              <ChatToolControls
-                vaultToggle={vaultToggle}
-                setVaultToggle={setVaultToggle}
-                webToggle={webToggle}
-                setWebToggle={setWebToggle}
-                composerToggle={composerToggle}
-                setComposerToggle={setComposerToggle}
-                autonomousAgentToggle={autonomousAgentToggle}
-                setAutonomousAgentToggle={setAutonomousAgentToggle}
-                currentChain={currentChain}
-                onVaultToggleOff={handleVaultToggleOff}
-                onWebToggleOff={handleWebToggleOff}
-                onComposerToggleOff={handleComposerToggleOff}
-              />
-              <TooltipProvider delayDuration={0}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost2"
-                      size="fit"
-                      className="tw-text-muted hover:tw-text-accent"
-                      onClick={() => {
-                        new AddImageModal(app, onAddImage).open();
-                      }}
-                    >
-                      <Image className="tw-size-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent className="tw-px-1 tw-py-0.5">Add image(s)</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              {editMode && onEditCancel && (
-                <Button
-                  variant="ghost2"
-                  size="fit"
-                  className="tw-text-muted"
-                  onClick={onEditCancel}
-                >
-                  <span>cancel</span>
-                </Button>
-              )}
+        <div className="tw-flex tw-items-end tw-gap-1">
+          <LexicalEditor
+            value={inputMessage}
+            onChange={(value) => setInputMessage(value)}
+            onSubmit={onSendMessage}
+            onNotesChange={setNotesFromPills}
+            onNotesRemoved={handleNotePillsRemoved}
+            onActiveNoteAdded={handleActiveNoteAdded}
+            onActiveNoteRemoved={handleActiveNoteRemoved}
+            onURLsChange={isCopilotPlus ? setUrlsFromPills : undefined}
+            onURLsRemoved={isCopilotPlus ? handleURLPillsRemoved : undefined}
+            onToolsChange={isCopilotPlus ? setToolsFromPills : undefined}
+            onToolsRemoved={isCopilotPlus ? handleToolPillsRemoved : undefined}
+            onFoldersChange={setFoldersFromPills}
+            onFoldersRemoved={handleFolderPillsRemoved}
+            onEditorReady={onEditorReady}
+            onImagePaste={onAddImage}
+            onTagSelected={handleTagSelected}
+            placeholder={"Ask about notes, @context, /prompts"}
+            disabled={isProjectLoading}
+            isCopilotPlus={isCopilotPlus}
+            currentActiveFile={currentActiveNote}
+            currentChain={currentChain}
+            className="tw-min-w-0 tw-flex-1"
+          />
+          <div className="tw-flex tw-items-center tw-gap-1 tw-pb-1">
+            {showOptionsMenu && (
               <Button
                 variant="ghost2"
-                size="fit"
-                className="tw-text-muted"
-                onClick={() => onSendMessage()}
+                size="icon"
+                aria-label="Chat options"
+                onClick={handleOpenOptionsMenu}
               >
-                <CornerDownLeft className="!tw-size-3" />
-                <span>{editMode ? "save" : "chat"}</span>
+                <MoreHorizontal className="tw-size-4" />
               </Button>
-            </>
-          )}
+            )}
+            {editMode && onEditCancel && (
+              <Button
+                variant="ghost2"
+                size="icon"
+                className="tw-text-muted"
+                onClick={onEditCancel}
+                aria-label="Cancel edit"
+              >
+                <X className="tw-size-4" />
+              </Button>
+            )}
+            <Button
+              variant="ghost2"
+              size="icon"
+              className="tw-text-normal"
+              onClick={() => {
+                if (isGenerating) {
+                  onStopGenerating();
+                  return;
+                }
+                onSendMessage();
+              }}
+              aria-label={
+                isGenerating ? "Stop generating" : editMode ? "Save edit" : "Send message"
+              }
+            >
+              {isGenerating ? (
+                <StopCircle className="tw-size-4" />
+              ) : (
+                <ArrowUp className="tw-size-4" />
+              )}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

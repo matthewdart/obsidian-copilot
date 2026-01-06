@@ -43,7 +43,6 @@ export const InlineMessageEditor: React.FC<InlineMessageEditorProps> = ({
       context: {
         notes: TFile[];
         urls: string[];
-        tags: string[];
         folders: string[];
       }
     ) => {
@@ -51,14 +50,14 @@ export const InlineMessageEditor: React.FC<InlineMessageEditorProps> = ({
       const newContext: ChatMessage["context"] = {
         notes: context.notes,
         urls: context.urls,
-        tags: context.tags,
+        tags: initialContext?.tags || [],
         folders: context.folders,
         selectedTextContexts: initialContext?.selectedTextContexts || [],
       };
 
       onSave(text, newContext);
     },
-    [onSave, initialContext?.selectedTextContexts]
+    [initialContext?.selectedTextContexts, initialContext?.tags, onSave]
   );
 
   // Handle cancelling the edit
@@ -79,19 +78,10 @@ export const InlineMessageEditor: React.FC<InlineMessageEditorProps> = ({
     setSelectedImages((prev) => [...prev, ...files]);
   }, []);
 
-  const handleRemoveSelectedText = useCallback((id: string) => {
-    // Handle selected text removal if needed
-  }, []);
-
-  const showProgressCard = useCallback(() => {
-    // Not used in edit mode
-  }, []);
-
   // Prepare initial context for ChatInput
   const initialChatInputContext = {
     notes: contextNotes,
     urls: initialContext?.urls || [],
-    tags: initialContext?.tags || [],
     folders: initialContext?.folders || [],
   };
 
@@ -111,9 +101,6 @@ export const InlineMessageEditor: React.FC<InlineMessageEditorProps> = ({
       onAddImage={handleAddImage}
       setSelectedImages={setSelectedImages}
       disableModelSwitch={false}
-      selectedTextContexts={initialContext?.selectedTextContexts}
-      onRemoveSelectedText={handleRemoveSelectedText}
-      showProgressCard={showProgressCard}
       editMode={true}
       onEditSave={handleEditSave}
       onEditCancel={handleEditCancel}

@@ -149,16 +149,16 @@ const LexicalEditor: React.FC<LexicalEditorProps> = ({
   return (
     <LexicalComposer initialConfig={initialConfig}>
       <ActiveFileProvider currentActiveFile={currentActiveFile}>
-        <div className={cn("tw-relative", className)}>
+        <div className={cn("tw-[--font-text-size:var(--font-ui-medium)] tw-relative", className)}>
           <PlainTextPlugin
             contentEditable={
               <ContentEditable
-                className="tw-max-h-40 tw-min-h-[60px] tw-w-full tw-resize-none tw-overflow-y-auto tw-rounded-md tw-border-none tw-bg-transparent tw-px-2 tw-text-sm tw-text-normal tw-outline-none focus-visible:tw-ring-0"
+                className="tw-max-h-40 tw-min-h-[52px] tw-w-full tw-resize-none tw-overflow-y-auto tw-rounded-md tw-border-none tw-bg-transparent tw-px-2 tw-py-1 tw-text-base tw-text-normal tw-outline-none focus-visible:tw-ring-0"
                 aria-label="Chat input"
               />
             }
             placeholder={
-              <div className="tw-pointer-events-none tw-absolute tw-left-2 tw-top-0 tw-select-none tw-text-sm tw-text-muted/60">
+              <div className="tw-pointer-events-none tw-absolute tw-left-2 tw-top-1 tw-select-none tw-text-base tw-text-muted/60">
                 {placeholder}
               </div>
             }

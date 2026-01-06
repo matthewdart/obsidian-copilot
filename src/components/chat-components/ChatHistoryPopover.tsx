@@ -3,7 +3,7 @@ import { ArrowUpRight, Check, Edit2, MessageCircle, Trash2, X } from "lucide-rea
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SearchBar } from "@/components/ui/SearchBar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { logError } from "@/logger";
@@ -16,12 +16,15 @@ export interface ChatHistoryItem {
 }
 
 interface ChatHistoryPopoverProps {
-  children: React.ReactNode;
+  children?: React.ReactNode;
   chatHistory: ChatHistoryItem[];
   onUpdateTitle: (id: string, newTitle: string) => Promise<void>;
   onDeleteChat: (id: string) => Promise<void>;
   onLoadChat?: (id: string) => Promise<void>;
   onOpenSourceFile?: (id: string) => Promise<void>;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  anchorClassName?: string;
 }
 
 export function ChatHistoryPopover({
@@ -31,13 +34,18 @@ export function ChatHistoryPopover({
   onDeleteChat,
   onLoadChat,
   onOpenSourceFile,
+  open,
+  onOpenChange,
+  anchorClassName,
 }: ChatHistoryPopoverProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const isMobile = Platform.isMobile;
+  const popoverOpen = open ?? internalOpen;
+  const handleOpenChange = onOpenChange ?? setInternalOpen;
 
   const filteredHistory = useMemo(() => {
     if (!searchQuery.trim()) return chatHistory;
@@ -155,12 +163,22 @@ export function ChatHistoryPopover({
     if (onLoadChat) {
       await onLoadChat(id);
     }
-    setOpen(false); // Close popover after loading chat
+    if (onOpenChange) {
+      onOpenChange(false);
+    } else {
+      setInternalOpen(false);
+    }
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>{children}</PopoverTrigger>
+    <Popover open={popoverOpen} onOpenChange={handleOpenChange}>
+      {children ? (
+        <PopoverTrigger asChild>{children}</PopoverTrigger>
+      ) : (
+        <PopoverAnchor asChild>
+          <span className={cn("tw-block tw-size-0", anchorClassName)} />
+        </PopoverAnchor>
+      )}
       <PopoverContent className="tw-w-80 tw-p-0" align="end" side="top">
         <div className="tw-flex tw-max-h-[400px] tw-flex-col">
           <div className="tw-shrink-0 tw-border-b tw-p-1">

@@ -17,6 +17,13 @@ module.exports = {
   },
   // https://github.com/tailwindlabs/tailwindcss/blob/main/stubs/config.full.js
   theme: {
+    fontSize: {
+      xs: ["calc(var(--font-text-size) * 0.8125)", { lineHeight: "var(--line-height-tight)" }],
+      sm: ["calc(var(--font-text-size) * 0.9375)", { lineHeight: "var(--line-height-tight)" }],
+      base: ["var(--font-text-size)", { lineHeight: "var(--line-height-normal)" }],
+      lg: ["calc(var(--font-text-size) * 1.125)", { lineHeight: "var(--line-height-normal)" }],
+      xl: ["calc(var(--font-text-size) * 1.25)", { lineHeight: "var(--line-height-normal)" }],
+    },
     textColor: {
       inherit: colors.inherit,
       current: colors.current,
